@@ -1,3 +1,7 @@
+# Multi-vehicle trajectory planning with collisions
+
+Final project for [MIT's Spring 2020 iteration of 6.832: Underactuated Robotics](http://underactuated.csail.mit.edu/Spring2020/).
+
 ## Setup
 
 [Install Python 3.8](https://www.python.org/downloads/).
