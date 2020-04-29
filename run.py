@@ -15,6 +15,7 @@ NUM_STATE_DIMENSIONS = 5
 
 CAR_RADIUS = 0.9  # meters
 MAX_ACCELERATION = 3.9  # m/s^2
+MAX_STEERING_ANGLE = np.pi / 4  # radians
 MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
 # Coefficient of restitution, determining the elasticity of car collisions
 RESTITUTION = 0.1
@@ -204,6 +205,9 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
                 ),
             )
         )
+        steering_angles = state_vars[t, :, 4]
+        solver.AddConstraint(pydrake.math.le(steering_angles, MAX_STEERING_ANGLE))
+        solver.AddConstraint(pydrake.math.ge(steering_angles, -MAX_STEERING_ANGLE))
 
     # Constrain control inputs
     for t in range(num_time_steps):
