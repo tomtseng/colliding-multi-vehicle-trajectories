@@ -12,11 +12,15 @@ NUM_CONTROL_DIMENSIONS = 2
 # state for a car is [x position, y position, heading, linear speed, steering
 # angle]
 NUM_STATE_DIMENSIONS = 5
+
 CAR_RADIUS = 0.9  # meters
-# Coefficient of restitution, determining the elasticity of car collisions
-RESTITUTION = 0.1
 MAX_ACCELERATION = 3.9  # m/s^2
 MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
+# Coefficient of restitution, determining the elasticity of car collisions
+RESTITUTION = 0.1
+
+EPSILON = 1e-2
+SECONDS_TO_MILLISECONDS = 1000
 
 
 def instantaneous_change_in_state(state, control):
@@ -107,7 +111,7 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
     ys = solver_result.GetSolution(state_vars[:, :, 1])
     ax.set(
         xlim=(np.min(xs) - CAR_RADIUS, np.max(xs) + CAR_RADIUS),
-        ylim=(np.min(xs) - CAR_RADIUS, np.max(ys) + CAR_RADIUS),
+        ylim=(np.min(ys) - CAR_RADIUS, np.max(ys) + CAR_RADIUS),
     )
 
     # Draw goal state.
@@ -178,7 +182,10 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
     for i in range(NUM_CARS):
         for j in range(NUM_STATE_DIMENSIONS):
             if goal_state[i][j] is not None:
-                solver.AddConstraint(state_vars[-1][i][j] == goal_state[i][j])
+                solver.AddConstraint(state_vars[-1][i][j] - goal_state[i][j] <= EPSILON)
+                solver.AddConstraint(
+                    -state_vars[-1][i][j] + goal_state[i][j] <= EPSILON
+                )
 
     # Penalize solutions that use large control inputs.
     for t in range(num_time_steps):
