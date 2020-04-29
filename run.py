@@ -15,6 +15,8 @@ NUM_STATE_DIMENSIONS = 5
 CAR_RADIUS = 0.9  # meters
 # Coefficient of restitution, determining the elasticity of car collisions
 RESTITUTION = 0.1
+MAX_ACCELERATION = 3.9  # m/s^2
+MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
 
 
 def instantaneous_change_in_state(state, control):
@@ -92,7 +94,7 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
       state_vars: (num_time_steps x NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array
         Solver variables representing State of cars at every time step.
       goal_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
-        Desired final state
+        Desired final state.
       time_step_size: float
         Size of one time step in seconds.
     """
@@ -128,11 +130,11 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
 
     def animate(t):
         for i in range(NUM_CARS):
-            x = solver_result.GetSolution(state_vars[t][i][0])
-            y = solver_result.GetSolution(state_vars[t][i][1])
+            x = solver_result.GetSolution(state_vars[t, i, 0])
+            y = solver_result.GetSolution(state_vars[t, i, 1])
             cars[i].center = (x, y)
 
-            heading = solver_result.GetSolution(state_vars[t][i][2])
+            heading = solver_result.GetSolution(state_vars[t, i, 2])
             car_headings[i].set_xdata([x, x + np.cos(heading) * CAR_RADIUS])
             car_headings[i].set_ydata([y, y + np.sin(heading) * CAR_RADIUS])
         return animated_objects
@@ -150,69 +152,91 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
     plt.show()
 
 
+def solve(start_state, goal_state, time_step_size, num_time_steps):
+    """Solves for vehicle trajectory from the start state to the goal state.
+
+    Arguments:
+      start_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
+        Desired start state of the cars.
+      goal_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of Optional[float]
+        Desired final state of the cars.
+      time_step_size: float
+        Size of one time step in seconds.
+      num_time_steps: int
+        Number of time steps for the cars to get from start to goal.
+    """
+
+    solver = pydrake.solvers.mathematicalprogram.MathematicalProgram()
+    state_vars = solver.NewContinuousVariables(
+        (num_time_steps + 1) * NUM_CARS * NUM_STATE_DIMENSIONS
+    ).reshape((num_time_steps + 1, NUM_CARS, NUM_STATE_DIMENSIONS))
+    control_vars = solver.NewContinuousVariables(
+        num_time_steps * NUM_CARS * NUM_CONTROL_DIMENSIONS
+    ).reshape((num_time_steps, NUM_CARS, NUM_CONTROL_DIMENSIONS))
+
+    solver.AddConstraint(pydrake.math.eq(state_vars[0], start_state))
+    for i in range(NUM_CARS):
+        for j in range(NUM_STATE_DIMENSIONS):
+            if goal_state[i][j] is not None:
+                solver.AddConstraint(state_vars[-1][i][j] == goal_state[i][j])
+
+    # Penalize solutions that use large control inputs.
+    for t in range(num_time_steps):
+        for c in range(NUM_CARS):
+            solver.AddCost(time_step_size * control_vars[t][c].dot(control_vars[t][c]))
+
+    # Enforce discrete dynamics.
+    for t in range(num_time_steps):
+        solver.AddConstraint(
+            pydrake.math.eq(
+                state_vars[t + 1],
+                discrete_dynamics(
+                    state=state_vars[t],
+                    control=control_vars[t],
+                    time_step_size=time_step_size,
+                ),
+            )
+        )
+
+    # Constrain control inputs
+    for t in range(num_time_steps):
+        for c in range(NUM_CARS):
+            solver.AddConstraint(control_vars[t][c][0] ** 2 <= MAX_ACCELERATION ** 2)
+            solver.AddConstraint(
+                control_vars[t][c][1] ** 2 <= MAX_STEERING_VELOCITY ** 2
+            )
+
+    solver_result = pydrake.solvers.mathematicalprogram.Solve(solver)
+    if solver_result.is_success():
+        plot_trajectory(
+            solver_result=solver_result,
+            state_vars=state_vars,
+            goal_state=goal_state,
+            time_step_size=time_step_size,
+        )
+    else:
+        infeasible_constraints = pydrake.solvers.mathematicalprogram.GetInfeasibleConstraints(
+            solver, solver_result
+        )
+        print("Failed to solve.")
+        print("Infeasible constraints:")
+        for constraint in infeasible_constraints:
+            print(constraint)
+
+
 START_STATE = np.array([[0, 0, 0.3, 1, 0], [7, 7, 0.4, 1, 0]])
 # Don't enforce heading on goal state --- there are undesirable results if the
 # cars turn more than 360 degrees in one direction.
 GOAL_STATE = np.array([[3, 2, None, 0, 0], [3, 4, None, 0, 0]])
 TIME_STEP_SIZE = 0.1  # seconds
 NUM_TIME_STEPS = 30
-MAX_ACCELERATION = 3.9  # m/s^2
-MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
 
-solver = pydrake.solvers.mathematicalprogram.MathematicalProgram()
-state_vars = solver.NewContinuousVariables(
-    (NUM_TIME_STEPS + 1) * NUM_CARS * NUM_STATE_DIMENSIONS
-).reshape((NUM_TIME_STEPS + 1, NUM_CARS, NUM_STATE_DIMENSIONS))
-control_vars = solver.NewContinuousVariables(
-    NUM_TIME_STEPS * NUM_CARS * NUM_CONTROL_DIMENSIONS
-).reshape((NUM_TIME_STEPS, NUM_CARS, NUM_CONTROL_DIMENSIONS))
-
-solver.AddConstraint(pydrake.math.eq(state_vars[0], START_STATE))
-for i in range(NUM_CARS):
-    for j in range(NUM_STATE_DIMENSIONS):
-        if GOAL_STATE[i][j] is not None:
-            solver.AddConstraint(state_vars[-1][i][j] == GOAL_STATE[i][j])
-
-# Penalize solutions that use large control inputs.
-for t in range(NUM_TIME_STEPS):
-    for c in range(NUM_CARS):
-        solver.AddCost(TIME_STEP_SIZE * control_vars[t][c].dot(control_vars[t][c]))
-
-# Enforce discrete dynamics.
-for t in range(NUM_TIME_STEPS):
-    solver.AddConstraint(
-        pydrake.math.eq(
-            state_vars[t + 1],
-            discrete_dynamics(
-                state=state_vars[t],
-                control=control_vars[t],
-                time_step_size=TIME_STEP_SIZE,
-            ),
-        )
-    )
-
-# Constrain control inputs
-for t in range(NUM_TIME_STEPS):
-    for c in range(NUM_CARS):
-        solver.AddConstraint(control_vars[t][c][0] ** 2 <= MAX_ACCELERATION ** 2)
-        solver.AddConstraint(control_vars[t][c][1] ** 2 <= MAX_STEERING_VELOCITY ** 2)
-
-solver_result = pydrake.solvers.mathematicalprogram.Solve(solver)
-if solver_result.is_success():
-    plot_trajectory(
-        solver_result=solver_result,
-        state_vars=state_vars,
-        goal_state=GOAL_STATE,
-        time_step_size=TIME_STEP_SIZE,
-    )
-else:
-    infeasible_constraints = pydrake.solvers.mathematicalprogram.GetInfeasibleConstraints(
-        solver, solver_result
-    )
-    print("Failed to solve.")
-    print("Infeasible constraints:")
-    for constraint in infeasible_constraints:
-        print(constraint)
+solve(
+    start_state=START_STATE,
+    goal_state=GOAL_STATE,
+    time_step_size=TIME_STEP_SIZE,
+    num_time_steps=NUM_TIME_STEPS,
+)
 
 # TODO(tomtseng) progression:
 # (1) [DONE] dummy implementation: skip collisions just use discrete dynamics
