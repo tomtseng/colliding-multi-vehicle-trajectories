@@ -28,6 +28,8 @@ def instantaneous_change_in_state(state, control):
     """Returns the instantaneous change in state with respect to time assuming
     no collisions.
 
+    This uses a simple car model. See http://planning.cs.uiuc.edu/node658.html .
+
     Arguments:
       state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
         [x position, y position, heading, linear speed, steering angle] for each
@@ -43,16 +45,13 @@ def instantaneous_change_in_state(state, control):
     # functions to represent mathematical operations.
     m = pydrake.symbolic if state.dtype == object else np
 
-    headings = state[:, [2]]
-    speeds = state[:, [3]]
-
     change_in_state = np.empty_like(state)
     for i in range(NUM_CARS):
         heading = state[i, 2]
         speed = state[i, 3]
-        change_in_state[i][0] = speed * m.cos(heading)
-        change_in_state[i][1] = speed * m.sin(heading)
-        change_in_state[i][2] = speed * m.tan(state[i, 4])
+        change_in_state[i, 0] = speed * m.cos(heading)
+        change_in_state[i, 1] = speed * m.sin(heading)
+        change_in_state[i, 2] = speed * m.tan(state[i, 4])
     change_in_state[:, 3:] = control
     return change_in_state
 
@@ -117,8 +116,8 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
 
     # Draw goal state.
     for i in range(NUM_CARS):
-        x, y = goal_state[i][:2]
-        goal = plt.Circle((x, y), radius=CAR_RADIUS, color=CAR_COLORS[i], alpha=0.2,)
+        x, y = goal_state[i, :2]
+        goal = plt.Circle((x, y), radius=CAR_RADIUS, color=CAR_COLORS[i], alpha=0.2)
         ax.add_patch(goal)
 
     # Draw the cars.
@@ -180,14 +179,12 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
     ).reshape((num_time_steps, NUM_CARS, NUM_CONTROL_DIMENSIONS))
 
     solver.AddConstraint(pydrake.math.eq(state_vars[0], start_state))
-    for i in range(NUM_CARS):
+    for c in range(NUM_CARS):
         for j in range(NUM_STATE_DIMENSIONS):
-            if goal_state[i][j] is not None:
-                solver.AddConstraint(state_vars[-1][i][j] - goal_state[i][j] <= EPSILON)
-                solver.AddConstraint(
-                    -state_vars[-1][i][j] + goal_state[i][j] <= EPSILON
-                )
-
+            if goal_state[c][j] is not None:
+                difference_from_goal = state_vars[-1, c, j] - goal_state[c, j]
+                solver.AddConstraint(difference_from_goal <= EPSILON)
+                solver.AddConstraint(difference_from_goal >= -EPSILON)
 
     # Penalize solutions that use large accelerations.
     solver.AddCost(
@@ -206,17 +203,17 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
                 ),
             )
         )
-        steering_angles = state_vars[t, :, 4]
-        solver.AddConstraint(pydrake.math.le(steering_angles, MAX_STEERING_ANGLE))
-        solver.AddConstraint(pydrake.math.ge(steering_angles, -MAX_STEERING_ANGLE))
+    steering_angles = state_vars[:, :, 4]
+    solver.AddConstraint(pydrake.math.le(steering_angles, MAX_STEERING_ANGLE))
+    solver.AddConstraint(pydrake.math.ge(steering_angles, -MAX_STEERING_ANGLE))
 
-    # Constrain control inputs
-    for t in range(num_time_steps):
-        for c in range(NUM_CARS):
-            solver.AddConstraint(control_vars[t][c][0] ** 2 <= MAX_ACCELERATION ** 2)
-            solver.AddConstraint(
-                control_vars[t][c][1] ** 2 <= MAX_STEERING_VELOCITY ** 2
-            )
+    # Constrain control inputs.
+    accelerations = control_vars[:, :, 0]
+    steering_velocities = control_vars[:, :, 1]
+    solver.AddConstraint(pydrake.math.le(accelerations, MAX_ACCELERATION))
+    solver.AddConstraint(pydrake.math.ge(accelerations, -MAX_ACCELERATION))
+    solver.AddConstraint(pydrake.math.le(steering_velocities, MAX_STEERING_VELOCITY))
+    solver.AddConstraint(pydrake.math.ge(steering_velocities, -MAX_STEERING_VELOCITY))
 
     solver_result = pydrake.solvers.mathematicalprogram.Solve(solver)
     if solver_result.is_success():
