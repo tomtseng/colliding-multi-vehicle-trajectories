@@ -19,3 +19,9 @@ Run virtualenv:
 ```sh
 source venv/bin/activate
 ```
+
+## Run the animation
+
+```sh
+python3 run.py
+```
