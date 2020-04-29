@@ -181,7 +181,7 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
     solver.AddConstraint(pydrake.math.eq(state_vars[0], start_state))
     for c in range(NUM_CARS):
         for j in range(NUM_STATE_DIMENSIONS):
-            if goal_state[c][j] is not None:
+            if goal_state[c, j] is not None:
                 difference_from_goal = state_vars[-1, c, j] - goal_state[c, j]
                 solver.AddConstraint(difference_from_goal <= EPSILON)
                 solver.AddConstraint(difference_from_goal >= -EPSILON)
