@@ -105,16 +105,7 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
     for i in range(NUM_CARS):
         x, y = goal_state[i][:2]
         goal = plt.Circle((x, y), radius=CAR_RADIUS, color=CAR_COLORS[i], alpha=0.2,)
-        heading = goal_state[i][2]
-        goal_heading = matplotlib.lines.Line2D(
-            [x, x + np.cos(heading) * CAR_RADIUS],
-            [y, y + np.sin(heading) * CAR_RADIUS],
-            color="k",
-            alpha=0.2,
-        )
-
         ax.add_patch(goal)
-        ax.add_line(goal_heading)
 
     # Draw the cars.
     cars = [
@@ -153,7 +144,9 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
 
 
 START_STATE = np.array([[0, 0, 0.3, 1, 0], [7, 7, 0.4, 1, 0]])
-GOAL_STATE = np.array([[3, 2, 0, 0, 0], [3, 4, 0, 0, 0]])
+# Don't enforce heading on goal state --- there are undesirable results if the
+# cars turn more than 360 degrees in one direction.
+GOAL_STATE = np.array([[3, 2, None, 0, 0], [3, 4, None, 0, 0]])
 TIME_STEP_SIZE = 0.1  # seconds
 NUM_TIME_STEPS = 30
 MAX_ACCELERATION = 3.9  # m/s^2
@@ -168,7 +161,10 @@ control_vars = solver.NewContinuousVariables(
 ).reshape((NUM_TIME_STEPS, NUM_CARS, NUM_CONTROL_DIMENSIONS))
 
 solver.AddConstraint(pydrake.math.eq(state_vars[0], START_STATE))
-solver.AddConstraint(pydrake.math.eq(state_vars[-1], GOAL_STATE))
+for i in range(NUM_CARS):
+    for j in range(NUM_STATE_DIMENSIONS):
+        if GOAL_STATE[i][j] is not None:
+            solver.AddConstraint(state_vars[-1][i][j] == GOAL_STATE[i][j])
 
 # Penalize solutions that use large control inputs.
 for t in range(NUM_TIME_STEPS):
