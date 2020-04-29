@@ -101,15 +101,20 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
     ax.set(xlim=(-2, 10), ylim=(-2, 10))
     ax.set_aspect("equal")
 
-    # Draw the goal state.
+    # Draw goal state.
     for i in range(NUM_CARS):
-        goal = plt.Circle(
-            (goal_state[i][0], goal_state[i][1]),
-            radius=CAR_RADIUS,
-            color=CAR_COLORS[i],
+        x, y = goal_state[i][:2]
+        goal = plt.Circle((x, y), radius=CAR_RADIUS, color=CAR_COLORS[i], alpha=0.2,)
+        heading = goal_state[i][2]
+        goal_heading = matplotlib.lines.Line2D(
+            [x, x + np.cos(heading) * CAR_RADIUS],
+            [y, y + np.sin(heading) * CAR_RADIUS],
+            color="k",
             alpha=0.2,
         )
+
         ax.add_patch(goal)
+        ax.add_line(goal_heading)
 
     # Draw the cars.
     cars = [
