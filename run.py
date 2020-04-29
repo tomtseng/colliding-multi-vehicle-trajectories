@@ -233,12 +233,12 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
             print(constraint)
 
 
-START_STATE = np.array([[0, 0, 0.3, 1, 0], [7, 7, 0.4, 1, 0]])
+START_STATE = np.array([[0, 0, 0, 0, 0], [4, -3, np.pi / 2, 0, 0]])
 # Don't enforce heading on goal state --- there are undesirable results if the
 # cars turn more than 360 degrees in one direction.
-GOAL_STATE = np.array([[3, 2, None, 0, 0], [3, 4, None, 0, 0]])
+GOAL_STATE = np.array([[6, 2, None, 0, 0], [3, 3, None, 0, 0]])
 TIME_STEP_SIZE = 0.1  # seconds
-NUM_TIME_STEPS = 30
+NUM_TIME_STEPS = 50
 
 solve(
     start_state=START_STATE,
