@@ -98,8 +98,15 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
     """
 
     fig, ax = plt.subplots()
-    ax.set(xlim=(-2, 10), ylim=(-2, 10))
     ax.set_aspect("equal")
+
+    # Set axis limits.
+    xs = solver_result.GetSolution(state_vars[:, :, 0])
+    ys = solver_result.GetSolution(state_vars[:, :, 1])
+    ax.set(
+        xlim=(np.min(xs) - CAR_RADIUS, np.max(xs) + CAR_RADIUS),
+        ylim=(np.min(xs) - CAR_RADIUS, np.max(ys) + CAR_RADIUS),
+    )
 
     # Draw goal state.
     for i in range(NUM_CARS):
