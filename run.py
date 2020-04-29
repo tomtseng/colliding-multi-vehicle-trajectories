@@ -188,10 +188,11 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
                     -state_vars[-1][i][j] + goal_state[i][j] <= EPSILON
                 )
 
-    # Penalize solutions that use large control inputs.
-    for t in range(num_time_steps):
-        for c in range(NUM_CARS):
-            solver.AddCost(time_step_size * control_vars[t][c].dot(control_vars[t][c]))
+
+    # Penalize solutions that use large accelerations.
+    solver.AddCost(
+        time_step_size * sum(accel ** 2 for accel in control_vars[:, :, 0].flatten())
+    )
 
     # Enforce discrete dynamics.
     for t in range(num_time_steps):
