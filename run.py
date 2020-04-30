@@ -48,7 +48,7 @@ def instantaneous_change_in_state(state, control):
 
 
 def discrete_dynamics(state, control, time_step_size):
-    """Returns the state after one time step.
+    """Returns the state after one time step assuming no collisions.
 
     Arguments:
       state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array
@@ -61,22 +61,7 @@ def discrete_dynamics(state, control, time_step_size):
     Returns:
       (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array
     """
-    next_state = (
-        state
-        + instantaneous_change_in_state(state=state, control=control) * time_step_size
-    )
-    # Account for collisions.
-    # TODO(tomtseng)
-    # will need to change state to have 2D velocity to model this
-    # properly
-    """
-    for i in range(NUM_CARS - 1):
-        for j in range(i + 1, NUM_CARS):
-            if (state[0][0] - state[1][0]) ** 2 + (state[0][1] - state[1][1]) ** 2 <= (2 * CAR_RADIUS) ** 2:
-                # TODO(tomtseng) do something real here
-                continue
-    """
-    return next_state
+    return state + instantaneous_change_in_state(state=state, control=control) * time_step_size
 
 
 def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
