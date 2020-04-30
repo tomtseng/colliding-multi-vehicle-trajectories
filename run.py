@@ -102,7 +102,7 @@ def solve(start_state, goal_state, num_time_samples):
     )
 
     MIN_TIMESTEP = 0.01
-    MAX_TIMESTEP = 0.1
+    MAX_TIMESTEP = 0.5
     solver = pydrake.systems.trajectory_optimization.DirectCollocation(
         linear_system,
         linear_system.CreateDefaultContext(),
@@ -122,8 +122,8 @@ def solve(start_state, goal_state, num_time_samples):
     for c in range(NUM_CARS):
         solver.AddConstraintToAllKnotPoints(control_vars[c] <= MAX_ACCELERATION)
         solver.AddConstraintToAllKnotPoints(control_vars[c] >= -MAX_ACCELERATION)
-    # Penalize solutions that use large accelerations.
-    solver.AddRunningCost(control_vars.dot(control_vars))
+    # Penalize solutions that use a lot of time.
+    solver.AddRunningCost(1)
 
     solver_result = pydrake.solvers.mathematicalprogram.Solve(solver)
     if solver_result.is_success():
@@ -141,7 +141,7 @@ def solve(start_state, goal_state, num_time_samples):
             print(constraint)
 
 
-START_STATE = np.array([[0, 0], [4, -3]])
+START_STATE = np.array([[0, 0], [4, -4]])
 # Don't enforce heading on goal state --- there are undesirable results if the
 # cars turn more than 360 degrees in one direction.
 GOAL_STATE = np.array([[3, 0], [6, 0]])
