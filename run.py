@@ -118,10 +118,25 @@ def solve(start_state, goal_state, num_time_samples):
     solver.AddBoundingBoxConstraint(
         flat_goal_state, flat_goal_state, solver.final_state()
     )
-    control_vars = solver.input()
     for c in range(NUM_CARS):
-        solver.AddConstraintToAllKnotPoints(control_vars[c] <= MAX_ACCELERATION)
-        solver.AddConstraintToAllKnotPoints(control_vars[c] >= -MAX_ACCELERATION)
+        solver.AddConstraintToAllKnotPoints(solver.input()[c] <= MAX_ACCELERATION)
+        solver.AddConstraintToAllKnotPoints(solver.input()[c] >= -MAX_ACCELERATION)
+
+    # Don't allow collisions.
+    # Since this is in one dimension, cars cannot pass each other, so we only
+    # have to check collisions
+    car_order = list(range(NUM_CARS))
+    car_order.sort(key=lambda c: start_state[c, 0])
+    state_vars = solver.state()
+    for i in range(1, NUM_CARS):
+        car_prev = car_order[i - 1]
+        car_next = car_order[i]
+        position_prev = state_vars[NUM_STATE_DIMENSIONS * car_prev]
+        position_next = state_vars[NUM_STATE_DIMENSIONS * car_next]
+        solver.AddConstraintToAllKnotPoints(
+            position_next >= position_prev + 2 * CAR_RADIUS
+        )
+
     # Penalize solutions that use a lot of time.
     solver.AddRunningCost(1)
 
@@ -149,7 +164,7 @@ def solve(start_state, goal_state, num_time_samples):
             print(constraint)
 
 
-START_STATE = np.array([[0, 0], [4, -4]])
+START_STATE = np.array([[0, 0], [4, -5]])
 # Don't enforce heading on goal state --- there are undesirable results if the
 # cars turn more than 360 degrees in one direction.
 GOAL_STATE = np.array([[3, 0], [6, 0]])
