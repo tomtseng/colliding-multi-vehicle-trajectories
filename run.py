@@ -125,6 +125,14 @@ def solve(start_state, goal_state, num_time_samples):
     # Penalize solutions that use a lot of time.
     solver.AddRunningCost(1)
 
+    initial_state_trajectory = pydrake.trajectories.PiecewisePolynomial.FirstOrderHold(
+        [0.0, num_time_samples * (MAX_TIMESTEP - MIN_TIMESTEP) / 2],
+        np.column_stack((flat_start_state, flat_goal_state)),
+    )
+    solver.SetInitialTrajectory(
+        pydrake.trajectories.PiecewisePolynomial(), initial_state_trajectory
+    )
+
     solver_result = pydrake.solvers.mathematicalprogram.Solve(solver)
     if solver_result.is_success():
         state_trajectory = solver.ReconstructStateTrajectory(solver_result)
