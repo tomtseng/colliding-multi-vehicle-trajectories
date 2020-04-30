@@ -7,16 +7,13 @@ import pydrake.solvers.mathematicalprogram
 NUM_CARS = 2
 # Color for each car in the animation.
 CAR_COLORS = ["r", "b"]
-# control for a car is [acceleration, steering angle]
-NUM_CONTROL_DIMENSIONS = 2
-# state for a car is [x position, y position, heading, linear speed, steering
-# angle]
-NUM_STATE_DIMENSIONS = 5
+# control for a car is [acceleration]
+NUM_CONTROL_DIMENSIONS = 1
+# state for a car is [position, speed]
+NUM_STATE_DIMENSIONS = 2
 
 CAR_RADIUS = 0.9  # meters
 MAX_ACCELERATION = 3.9  # m/s^2
-MAX_STEERING_ANGLE = np.pi / 4  # radians
-MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
 # Coefficient of restitution, determining the elasticity of car collisions
 RESTITUTION = 0.1
 
@@ -32,10 +29,9 @@ def instantaneous_change_in_state(state, control):
 
     Arguments:
       state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
-        [x position, y position, heading, linear speed, steering angle] for each
-        car
+        State for each car.
       control: (NUM_CARS x NUM_CONTROL_DIMENSIONS)-dimensional array of floats
-        [acceleration, steering velocity] for each car
+        Control for each car.
 
     Returns:
       (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
@@ -46,13 +42,8 @@ def instantaneous_change_in_state(state, control):
     m = pydrake.symbolic if state.dtype == object else np
 
     change_in_state = np.empty_like(state)
-    for i in range(NUM_CARS):
-        heading = state[i, 2]
-        speed = state[i, 3]
-        change_in_state[i, 0] = speed * m.cos(heading)
-        change_in_state[i, 1] = speed * m.sin(heading)
-        change_in_state[i, 2] = speed * m.tan(state[i, 4])
-    change_in_state[:, 3:] = control
+    change_in_state[:, 0] = state[:, 1]
+    change_in_state[:, 1] = control[:, 0]
     return change_in_state
 
 
@@ -61,10 +52,9 @@ def discrete_dynamics(state, control, time_step_size):
 
     Arguments:
       state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array
-        [x position, y position, heading, linear speed, steering angle] for each
-        car
+        State for each car.
       control: (NUM_CARS x NUM_CONTROL_DIMENSIONS)-dimensional array
-        [acceleration, steering velocity] for each car
+        Control for each car.
       time_step_size: float
         Size of one time step in seconds.
 
@@ -108,16 +98,15 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
 
     # Set axis limits.
     xs = solver_result.GetSolution(state_vars[:, :, 0])
-    ys = solver_result.GetSolution(state_vars[:, :, 1])
     ax.set(
         xlim=(np.min(xs) - CAR_RADIUS, np.max(xs) + CAR_RADIUS),
-        ylim=(np.min(ys) - CAR_RADIUS, np.max(ys) + CAR_RADIUS),
+        ylim=(-2 * CAR_RADIUS, 2 * CAR_RADIUS),
     )
 
     # Draw goal state.
     for i in range(NUM_CARS):
-        x, y = goal_state[i, :2]
-        goal = plt.Circle((x, y), radius=CAR_RADIUS, color=CAR_COLORS[i], alpha=0.2)
+        x = goal_state[i, 0]
+        goal = plt.Circle((x, 0), radius=CAR_RADIUS, color=CAR_COLORS[i], alpha=0.2)
         ax.add_patch(goal)
 
     # Draw the cars.
@@ -127,21 +116,12 @@ def plot_trajectory(solver_result, state_vars, goal_state, time_step_size):
     ]
     for car in cars:
         ax.add_patch(car)
-    car_headings = [matplotlib.lines.Line2D([], [], color="k") for i in range(NUM_CARS)]
-    for car_heading in car_headings:
-        ax.add_line(car_heading)
-    animated_objects = cars + car_headings
 
     def animate(t):
         for i in range(NUM_CARS):
             x = solver_result.GetSolution(state_vars[t, i, 0])
-            y = solver_result.GetSolution(state_vars[t, i, 1])
-            cars[i].center = (x, y)
-
-            heading = solver_result.GetSolution(state_vars[t, i, 2])
-            car_headings[i].set_xdata([x, x + np.cos(heading) * CAR_RADIUS])
-            car_headings[i].set_ydata([y, y + np.sin(heading) * CAR_RADIUS])
-        return animated_objects
+            cars[i].center = (x, 0)
+        return cars
 
     SECONDS_TO_MILLISECONDS = 1000
     matplotlib.animation.FuncAnimation(
@@ -203,17 +183,11 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
                 ),
             )
         )
-    steering_angles = state_vars[:, :, 4]
-    solver.AddConstraint(pydrake.math.le(steering_angles, MAX_STEERING_ANGLE))
-    solver.AddConstraint(pydrake.math.ge(steering_angles, -MAX_STEERING_ANGLE))
 
     # Constrain control inputs.
     accelerations = control_vars[:, :, 0]
-    steering_velocities = control_vars[:, :, 1]
     solver.AddConstraint(pydrake.math.le(accelerations, MAX_ACCELERATION))
     solver.AddConstraint(pydrake.math.ge(accelerations, -MAX_ACCELERATION))
-    solver.AddConstraint(pydrake.math.le(steering_velocities, MAX_STEERING_VELOCITY))
-    solver.AddConstraint(pydrake.math.ge(steering_velocities, -MAX_STEERING_VELOCITY))
 
     solver_result = pydrake.solvers.mathematicalprogram.Solve(solver)
     if solver_result.is_success():
@@ -233,10 +207,10 @@ def solve(start_state, goal_state, time_step_size, num_time_steps):
             print(constraint)
 
 
-START_STATE = np.array([[0, 0, 0, 0, 0], [4, -3, np.pi / 2, 0, 0]])
+START_STATE = np.array([[0, 0], [4, -3]])
 # Don't enforce heading on goal state --- there are undesirable results if the
 # cars turn more than 360 degrees in one direction.
-GOAL_STATE = np.array([[6, 2, None, 0, 0], [3, 3, None, 0, 0]])
+GOAL_STATE = np.array([[3, 0], [6, 0]])
 TIME_STEP_SIZE = 0.1  # seconds
 NUM_TIME_STEPS = 50
 
