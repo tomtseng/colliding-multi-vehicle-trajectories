@@ -92,6 +92,8 @@ def solve(start_state, goal_state, num_time_samples):
       goal_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of Optional[float]
         Desired final state of the cars.
     """
+    MIN_TIMESTEP = 0.01
+    MAX_TIMESTEP = 0.5
 
     A = np.kron(np.eye(NUM_CARS), np.array([[0, 1], [0, 0]]))
     B = np.kron(np.eye(NUM_CARS), np.array([[0], [1]]))
@@ -100,57 +102,85 @@ def solve(start_state, goal_state, num_time_samples):
     linear_system = pydrake.systems.primitives.LinearSystem(
         A=A, B=B, C=C, D=D, time_period=0.0
     )
+    system_context = linear_system.CreateDefaultContext()
+    collocation_constraint = pydrake.systems.trajectory_optimization.DirectCollocationConstraint(
+        system=linear_system,
+        context=system_context)
 
-    MIN_TIMESTEP = 0.01
-    MAX_TIMESTEP = 0.5
-    solver = pydrake.systems.trajectory_optimization.DirectCollocation(
-        linear_system,
-        linear_system.CreateDefaultContext(),
-        num_time_samples=num_time_samples,
-        minimum_timestep=MIN_TIMESTEP,
-        maximum_timestep=MAX_TIMESTEP,
-    )
-    flat_start_state = start_state.flatten()
-    flat_goal_state = goal_state.flatten()
-    solver.AddBoundingBoxConstraint(
-        flat_start_state, flat_start_state, solver.initial_state()
-    )
-    solver.AddBoundingBoxConstraint(
-        flat_goal_state, flat_goal_state, solver.final_state()
-    )
-    for c in range(NUM_CARS):
-        solver.AddConstraintToAllKnotPoints(solver.input()[c] <= MAX_ACCELERATION)
-        solver.AddConstraintToAllKnotPoints(solver.input()[c] >= -MAX_ACCELERATION)
+    solver = pydrake.solvers.mathematicalprogram.MathematicalProgram()
+    state_vars = solver.NewContinuousVariables(
+        (num_time_samples + 1) * NUM_CARS * NUM_STATE_DIMENSIONS, name="state"
+    ).reshape((num_time_samples + 1, NUM_CARS, NUM_STATE_DIMENSIONS))
+    control_vars = solver.NewContinuousVariables(
+        (num_time_samples + 1) * NUM_CARS * NUM_CONTROL_DIMENSIONS, name="control"
+    ).reshape((num_time_samples + 1, NUM_CARS, NUM_CONTROL_DIMENSIONS))
+    time_vars = solver.NewContinuousVariables(num_time_samples, name="time")
+
+    solver.AddBoundingBoxConstraint(MIN_TIMESTEP, MAX_TIMESTEP, time_vars)
+
+    solver.AddConstraint(pydrake.math.eq(state_vars[0], start_state))
+    solver.AddConstraint(pydrake.math.eq(state_vars[-1], goal_state))
+
+    solver.AddBoundingBoxConstraint(-MAX_ACCELERATION, MAX_ACCELERATION, control_vars[:, :, 0])
+
+    for t in range(num_time_samples):
+        pydrake.systems.trajectory_optimization.AddDirectCollocationConstraint(
+                constraint=collocation_constraint,
+                timestep=[time_vars[t]],
+                state=state_vars[t].flatten(),
+                next_state=state_vars[t + 1].flatten(),
+                input=control_vars[t].flatten(),
+                next_input=control_vars[t + 1].flatten(),
+                prog=solver)
 
     # Don't allow collisions.
     # Since this is in one dimension, cars cannot pass each other, so we only
-    # have to check collisions
+    # have to check collisions between adjacent cars.
     car_order = list(range(NUM_CARS))
     car_order.sort(key=lambda c: start_state[c, 0])
-    state_vars = solver.state()
     for i in range(1, NUM_CARS):
         car_prev = car_order[i - 1]
         car_next = car_order[i]
-        position_prev = state_vars[NUM_STATE_DIMENSIONS * car_prev]
-        position_next = state_vars[NUM_STATE_DIMENSIONS * car_next]
-        solver.AddConstraintToAllKnotPoints(
-            position_next >= position_prev + 2 * CAR_RADIUS
-        )
+        position_prev = state_vars[:, car_prev, 0]
+        position_next = state_vars[:, car_next, 0]
+        solver.AddConstraint(pydrake.math.ge(position_next, position_prev + 2 * CAR_RADIUS))
 
     # Penalize solutions that use a lot of time.
-    solver.AddRunningCost(1)
+    solver.AddCost(sum(time_vars))
 
-    initial_state_trajectory = pydrake.trajectories.PiecewisePolynomial.FirstOrderHold(
-        [0.0, num_time_samples * (MAX_TIMESTEP - MIN_TIMESTEP) / 2],
-        np.column_stack((flat_start_state, flat_goal_state)),
+    # Set the initial state trajectory guess to be  a linear interpolation from
+    # the start state to the goal state.
+    TIMESTEP_GUESS = (MAX_TIMESTEP - MIN_TIMESTEP) / 2
+    state_trajectory_guess = pydrake.trajectories.PiecewisePolynomial.FirstOrderHold(
+        [0.0, num_time_samples * TIMESTEP_GUESS],
+        np.column_stack((start_state.flatten(), goal_state.flatten())),
     )
-    solver.SetInitialTrajectory(
-        pydrake.trajectories.PiecewisePolynomial(), initial_state_trajectory
-    )
+    solver.SetInitialGuess(time_vars, np.full_like(a=time_vars, fill_value=TIMESTEP_GUESS))
+    solver.SetInitialGuess(
+            state_vars.reshape((num_time_samples + 1, -1)),
+            np.vstack([state_trajectory_guess.value(t * TIMESTEP_GUESS).T for t in
+                range(num_time_samples + 1)]))
 
     solver_result = pydrake.solvers.mathematicalprogram.Solve(solver)
+
     if solver_result.is_success():
-        state_trajectory = solver.ReconstructStateTrajectory(solver_result)
+        # Get the state trajectory as a cubic spline. This follows the
+        # implementation of
+        # pydrake.systems.trajectory_optimization.DirectCollocation::ReconstructStateTrajectory
+        # from
+        # https://github.com/RobotLocomotion/drake/blob/709ff3ed522f158c4dfbb5c6cfb50190e47af588/systems/trajectory_optimization/direct_collocation.cc#L224
+        timesteps = solver_result.GetSolution(time_vars)
+        states = solver_result.GetSolution(state_vars.reshape((num_time_samples + 1, -1)))
+        controls = solver_result.GetSolution(control_vars.reshape((num_time_samples + 1, -1)))
+        times = np.empty(num_time_samples + 1)
+        derivatives = np.empty_like(states)
+        for t in range(num_time_samples + 1):
+            times[t] = 0 if t == 0 else times[t - 1] + timesteps[t - 1]
+            system_context.SetContinuousState(states[t])
+            system_context.FixInputPort(index=0, data=controls[t])
+            derivatives[t] = linear_system.EvalTimeDerivatives(system_context).CopyToVector()
+        state_trajectory = pydrake.trajectories.PiecewisePolynomial.CubicHermite(breaks=times, samples=states.T, samples_dot=derivatives.T)
+
         plot_trajectory(
             state_trajectory=state_trajectory, goal_state=goal_state,
         )
