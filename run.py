@@ -112,8 +112,8 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
     )
     system_context = linear_system.CreateDefaultContext()
     collocation_constraint = pydrake.systems.trajectory_optimization.DirectCollocationConstraint(
-        system=linear_system,
-        context=system_context)
+        system=linear_system, context=system_context
+    )
 
     solver = pydrake.solvers.mathematicalprogram.MathematicalProgram()
 
@@ -134,19 +134,30 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
     control_vars = []  # represents control of cars at each time sample
     time_vars = []  # represents interval between each time sample
     for traj_idx in range(num_trajectories):
-        state_vars.append(solver.NewContinuousVariables(
-            (time_samples_per_trajectory + 1) * NUM_CARS * NUM_STATE_DIMENSIONS,
-            name="state" + str(traj_idx)
-        ).reshape((time_samples_per_trajectory + 1, NUM_CARS, NUM_STATE_DIMENSIONS)))
-        control_vars.append(solver.NewContinuousVariables(
-            (time_samples_per_trajectory + 1) * NUM_CARS * NUM_CONTROL_DIMENSIONS,
-            name="control" + str(traj_idx)
-            ).reshape((time_samples_per_trajectory + 1, NUM_CARS, NUM_CONTROL_DIMENSIONS)))
-        time_vars.append(solver.NewContinuousVariables(time_samples_per_trajectory,
-            name="time" + str(traj_idx)))
+        state_vars.append(
+            solver.NewContinuousVariables(
+                (time_samples_per_trajectory + 1) * NUM_CARS * NUM_STATE_DIMENSIONS,
+                name="state" + str(traj_idx),
+            ).reshape((time_samples_per_trajectory + 1, NUM_CARS, NUM_STATE_DIMENSIONS))
+        )
+        control_vars.append(
+            solver.NewContinuousVariables(
+                (time_samples_per_trajectory + 1) * NUM_CARS * NUM_CONTROL_DIMENSIONS,
+                name="control" + str(traj_idx),
+            ).reshape(
+                (time_samples_per_trajectory + 1, NUM_CARS, NUM_CONTROL_DIMENSIONS)
+            )
+        )
+        time_vars.append(
+            solver.NewContinuousVariables(
+                time_samples_per_trajectory, name="time" + str(traj_idx)
+            )
+        )
 
         solver.AddBoundingBoxConstraint(MIN_TIMESTEP, MAX_TIMESTEP, time_vars[-1])
-        solver.AddBoundingBoxConstraint(-MAX_ACCELERATION, MAX_ACCELERATION, control_vars[-1][:, :, 0])
+        solver.AddBoundingBoxConstraint(
+            -MAX_ACCELERATION, MAX_ACCELERATION, control_vars[-1][:, :, 0]
+        )
 
         if traj_idx == 0:
             solver.AddConstraint(pydrake.math.eq(state_vars[-1][0], start_state))
@@ -165,13 +176,14 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
 
         for t in range(time_samples_per_trajectory):
             pydrake.systems.trajectory_optimization.AddDirectCollocationConstraint(
-                    constraint=collocation_constraint,
-                    timestep=[time_vars[-1][t]],
-                    state=state_vars[-1][t].flatten(),
-                    next_state=state_vars[-1][t + 1].flatten(),
-                    input=control_vars[-1][t].flatten(),
-                    next_input=control_vars[-1][t + 1].flatten(),
-                    prog=solver)
+                constraint=collocation_constraint,
+                timestep=[time_vars[-1][t]],
+                state=state_vars[-1][t].flatten(),
+                next_state=state_vars[-1][t + 1].flatten(),
+                input=control_vars[-1][t].flatten(),
+                next_input=control_vars[-1][t + 1].flatten(),
+                prog=solver,
+            )
 
         # Don't allow collisions within a sub-trajectory.
         # Since this is in one dimension, cars cannot pass each other, so we only
@@ -183,14 +195,24 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
             car_next = car_order[i]
             position_prev = state_vars[-1][:, car_prev, 0]
             position_next = state_vars[-1][:, car_next, 0]
-            solver.AddConstraint(pydrake.math.ge(position_next, position_prev + 2 * CAR_RADIUS))
+            solver.AddConstraint(
+                pydrake.math.ge(position_next, position_prev + 2 * CAR_RADIUS)
+            )
 
-        solver.SetInitialGuess(time_vars[-1], np.full_like(a=time_vars[-1], fill_value=TIMESTEP_GUESS))
         solver.SetInitialGuess(
-                state_vars[-1].reshape((time_samples_per_trajectory + 1, -1)),
-                np.vstack([state_trajectory_guess.value(((time_samples_per_trajectory
-                    * traj_idx) + t) * TIMESTEP_GUESS).T for t in
-                range(time_samples_per_trajectory + 1)]))
+            time_vars[-1], np.full_like(a=time_vars[-1], fill_value=TIMESTEP_GUESS)
+        )
+        solver.SetInitialGuess(
+            state_vars[-1].reshape((time_samples_per_trajectory + 1, -1)),
+            np.vstack(
+                [
+                    state_trajectory_guess.value(
+                        ((time_samples_per_trajectory * traj_idx) + t) * TIMESTEP_GUESS
+                    ).T
+                    for t in range(time_samples_per_trajectory + 1)
+                ]
+            ),
+        )
 
     # Penalize solutions that use a lot of time.
     solver.AddCost(sum(sum(ts) for ts in time_vars))
@@ -207,16 +229,26 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
             # from
             # https://github.com/RobotLocomotion/drake/blob/709ff3ed522f158c4dfbb5c6cfb50190e47af588/systems/trajectory_optimization/direct_collocation.cc#L224
             timesteps = solver_result.GetSolution(time_vars[traj_idx])
-            states = solver_result.GetSolution(state_vars[traj_idx].reshape((time_samples_per_trajectory + 1, -1)))
-            controls = solver_result.GetSolution(control_vars[traj_idx].reshape((time_samples_per_trajectory + 1, -1)))
+            states = solver_result.GetSolution(
+                state_vars[traj_idx].reshape((time_samples_per_trajectory + 1, -1))
+            )
+            controls = solver_result.GetSolution(
+                control_vars[traj_idx].reshape((time_samples_per_trajectory + 1, -1))
+            )
             times = np.empty(time_samples_per_trajectory + 1)
             derivatives = np.empty_like(states)
             for t in range(time_samples_per_trajectory + 1):
-                times[t] = cumulative_time if t == 0 else times[t - 1] + timesteps[t - 1]
+                times[t] = (
+                    cumulative_time if t == 0 else times[t - 1] + timesteps[t - 1]
+                )
                 system_context.SetContinuousState(states[t])
                 system_context.FixInputPort(index=0, data=controls[t])
-                derivatives[t] = linear_system.EvalTimeDerivatives(system_context).CopyToVector()
-            subtrajectory = pydrake.trajectories.PiecewisePolynomial.CubicHermite(breaks=times, samples=states.T, samples_dot=derivatives.T)
+                derivatives[t] = linear_system.EvalTimeDerivatives(
+                    system_context
+                ).CopyToVector()
+            subtrajectory = pydrake.trajectories.PiecewisePolynomial.CubicHermite(
+                breaks=times, samples=states.T, samples_dot=derivatives.T
+            )
             cumulative_time = times[-1]
             state_trajectory.ConcatenateInTime(subtrajectory)
 
@@ -241,6 +273,8 @@ NUM_TIME_SAMPLES = 30
 COLLISION_SEQUENCE = []
 
 solve(
-    start_state=START_STATE, goal_state=GOAL_STATE, num_time_samples=NUM_TIME_SAMPLES,
-    collision_sequence=COLLISION_SEQUENCE
+    start_state=START_STATE,
+    goal_state=GOAL_STATE,
+    num_time_samples=NUM_TIME_SAMPLES,
+    collision_sequence=COLLISION_SEQUENCE,
 )
