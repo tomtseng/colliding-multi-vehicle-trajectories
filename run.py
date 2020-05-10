@@ -24,6 +24,7 @@ NUM_CONTROL_DIMENSIONS = 2
 # in the heading direction, and the steering angle is the front axle angle
 # relative to the heading.
 NUM_STATE_DIMENSIONS = 5
+NUM_POSITION_DIMENSIONS = 2  # x, y
 
 CAR_RADIUS = 0.9  # meters
 # COG = center of gravity. The center of gravity of a car is assumed to be at
@@ -120,11 +121,11 @@ def plot_trajectory(state_trajectory, goal_position):
     Arguments:
       state_trajectory: pydrake.trajectories.PiecewisePolynomial
         Trajectory to plot.
-      goal_position: (NUM_CARS x 2)-dimensional array of floats
+      goal_position: (NUM_CARS x NUM_POSITION_DIMENSIONS)-dimensional array of floats
         Desired final position.
     """
-    FRAME_RATE = 25  # hertz
-    TIMESTEP = 1 / FRAME_RATE  # seconds
+    FRAME_RATE = 25  # 1/s
+    TIMESTEP = 1 / FRAME_RATE  # s
 
     fig, ax = plt.subplots()
     ax.set_aspect("equal")
@@ -200,7 +201,7 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
     Arguments:
       start_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
         Desired start state of the cars.
-      goal_position: (NUM_CARS x 2)-dimensional array of floats
+      goal_position: (NUM_CARS x NUM_POSITION_DIMENSIONS)-dimensional array of floats
         Desired final position of the cars. The position is relative to the
         center of gravity of the each car, not the rear axle of reach car.
       num_time_samples: int
@@ -214,6 +215,9 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
     # Bounds on time step on each time sample
     MIN_TIMESTEP = 0.01  # seconds
     MAX_TIMESTEP = 0.2  # seconds
+    SOLVER_OUTPUT_FILE = "/tmp/snopt-output.txt"
+    SNOPT_ITERATIONS_LIMIT = 100000  # default is 10000
+    SNOPT_MAJOR_ITERATIONS_LIMIT = 10000  # default is 1000
 
     cars_system = CarsSystem_[None]()
     system_context = cars_system.CreateDefaultContext()
@@ -222,20 +226,22 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
     )
 
     solver = pydrake.solvers.mathematicalprogram.MathematicalProgram()
+    # See section 7.7 of "User’s Guide for SNOPT Version 7.5" for SNOPT option
+    # descriptions.
     solver.SetSolverOption(
         pydrake.solvers.mathematicalprogram.SolverType.kSnopt,
         "Print file",
-        "/tmp/snopt-output.txt",
-    )
-    solver.SetSolverOption(
-        pydrake.solvers.mathematicalprogram.SolverType.kSnopt,
-        "Major iterations limit",
-        10000,
+        SOLVER_OUTPUT_FILE,
     )
     solver.SetSolverOption(
         pydrake.solvers.mathematicalprogram.SolverType.kSnopt,
         "Iterations limit",
-        100000,
+        SNOPT_ITERATIONS_LIMIT,
+    )
+    solver.SetSolverOption(
+        pydrake.solvers.mathematicalprogram.SolverType.kSnopt,
+        "Major iterations limit",
+        SNOPT_MAJOR_ITERATIONS_LIMIT,
     )
 
     # Solve for the trajectory as a sequence of collision-free sub-trajectories.
@@ -344,8 +350,8 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
             time_vars[-1], np.full_like(a=time_vars[-1], fill_value=TIMESTEP_GUESS)
         )
         solver.SetInitialGuess(
-            state_vars[-1][:, :, :2].reshape(
-                (time_samples_per_trajectory + 1, NUM_CARS * 2)
+            state_vars[-1][:, :, :NUM_POSITION_DIMENSIONS].reshape(
+                (time_samples_per_trajectory + 1, NUM_CARS * NUM_POSITION_DIMENSIONS)
             ),
             np.vstack(
                 [
@@ -411,13 +417,13 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
 
 if __name__ == "__main__":
     START_STATE = np.array([[0, 0, 0, 0, 0], [4, -3, np.pi / 4, 0, 0]])
-    GOAL_POSITION = np.array([[6, 2], [3, 3]])
+    GOAL_CENTER_OF_GRAVITY_POSITION = np.array([[6, 2], [3, 3]])
     NUM_TIME_SAMPLES = 30
     COLLISION_SEQUENCE = []
 
     solve(
         start_state=START_STATE,
-        goal_position=GOAL_POSITION,
+        goal_position=GOAL_CENTER_OF_GRAVITY_POSITION,
         num_time_samples=NUM_TIME_SAMPLES,
         collision_sequence=COLLISION_SEQUENCE,
     )
