@@ -2,6 +2,10 @@
 Searches for an approximate trajectory for several circular cars to get from a
 start location to an end location.
 """
+#!/usr/bin/env python3
+
+import time
+
 import matplotlib.pyplot as plt
 import matplotlib.animation
 import numpy as np
@@ -366,7 +370,11 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
     # Penalize solutions that use a lot of time.
     solver.AddCost(sum(sum(ts) for ts in time_vars))
 
+    print("Solving...")
+    start_time = time.time()
     solver_result = pydrake.solvers.mathematicalprogram.Solve(solver)
+    end_time = time.time()
+    print("Done solving: {} seconds".format(end_time - start_time))
     if solver_result.is_success():
         state_trajectory = pydrake.trajectories.PiecewisePolynomial()
         cumulative_time = 0
@@ -408,8 +416,7 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
         infeasible_constraints = pydrake.solvers.mathematicalprogram.GetInfeasibleConstraints(
             solver, solver_result
         )
-        print("Failed to solve.")
-        print(solver_result.get_solution_result())
+        print("Failed to solve: {}".format(solver_result.get_solution_result()))
         print("Infeasible constraints:")
         for constraint in infeasible_constraints:
             print(constraint)
