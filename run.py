@@ -1,3 +1,7 @@
+"""
+Searches for an approximate trajectory for several circular cars to get from a
+start location to an end location.
+"""
 import matplotlib.pyplot as plt
 import matplotlib.animation
 import numpy as np
@@ -14,10 +18,18 @@ CAR_COLORS = ["r", "b"]
 # control for a car is [acceleration, steering angle]
 NUM_CONTROL_DIMENSIONS = 2
 # state for a car is [x position, y position, heading, linear speed, steering
-# angle]
+# angle].
+# The state uses the rear axle as its reference frame; the heading is the
+# direction of the rear wheel, the linear speed is the speed of the rear wheel
+# in the heading direction, and the steering angle is the front axle angle
+# relative to the heading.
 NUM_STATE_DIMENSIONS = 5
 
 CAR_RADIUS = 0.9  # meters
+# COG = center of gravity. The center of gravity of a car is assumed to be at
+# the center of the circle representing the car.
+COG_TO_REAR_AXLE_LENGTH = 0.6  # meters
+
 MAX_ACCELERATION = 3.9  # m/s^2
 MAX_STEERING_ANGLE = np.pi / 4  # radians
 MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
@@ -86,15 +98,26 @@ def CarsSystem_(T):
 
     return Impl
 
+def get_center_of_gravity(x_rear_axle, y_rear_axle, heading):
+    """Computes the position of the center of gravity of a car given the position and heading
+    of the rear axle.
+    """
+    # If the state and control are symbolic variables used for optimization,
+    # then we need to call pydrake.symbolic functions rather than numpy
+    # functions to represent mathematical operations.
+    m = pydrake.symbolic if type(x_rear_axle) == pydrake.symbolic.Variable else np
 
-def plot_trajectory(state_trajectory, goal_state):
+    return (x_rear_axle + COG_TO_REAR_AXLE_LENGTH * m.cos(heading),
+            y_rear_axle + COG_TO_REAR_AXLE_LENGTH * m.sin(heading))
+
+def plot_trajectory(state_trajectory, goal_position):
     """Plots and animates a state trajectory.
 
     Arguments:
       state_trajectory: pydrake.trajectories.PiecewisePolynomial
         Trajectory to plot.
-      goal_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
-        Desired final state.
+      goal_position: (NUM_CARS x 2)-dimensional array of floats
+        Desired final position.
     """
     FRAME_RATE = 25  # hertz
     TIMESTEP = 1 / FRAME_RATE  # seconds
@@ -113,13 +136,13 @@ def plot_trajectory(state_trajectory, goal_state):
     ys = state_values[:, :, 1]
     # Set axis limits.
     ax.set(
-        xlim=(np.min(xs) - CAR_RADIUS, np.max(xs) + CAR_RADIUS),
-        ylim=(np.min(ys) - CAR_RADIUS, np.max(ys) + CAR_RADIUS),
+        xlim=(np.min(xs) - 2 * CAR_RADIUS, np.max(xs) + 2 * CAR_RADIUS),
+        ylim=(np.min(ys) - 2 * CAR_RADIUS, np.max(ys) + 2 * CAR_RADIUS),
     )
 
     # Draw goal state.
     for i in range(NUM_CARS):
-        x, y = goal_state[i, :2]
+        x, y = goal_position[i]
         goal = plt.Circle((x, y), radius=CAR_RADIUS, color=CAR_COLORS[i], alpha=0.2)
         ax.add_patch(goal)
 
@@ -130,17 +153,23 @@ def plot_trajectory(state_trajectory, goal_state):
     ]
     for car in cars:
         ax.add_patch(car)
-    car_headings = [matplotlib.lines.Line2D([], [], color="k") for i in range(NUM_CARS)]
-    for car_heading in car_headings:
-        ax.add_line(car_heading)
-    animated_objects = cars + car_headings
+    front_axles = [matplotlib.lines.Line2D([], [], color="k") for i in range(NUM_CARS)]
+    for front_axle in front_axles:
+        ax.add_line(front_axle)
+    rear_axles = [matplotlib.lines.Line2D([], [], color="k") for i in range(NUM_CARS)]
+    for rear_axle in rear_axles:
+        ax.add_line(rear_axle)
+    animated_objects = cars + rear_axles + front_axles
 
     def animate(t):
         for i in range(NUM_CARS):
-            x, y, heading = state_values[t, i, :3]
-            cars[i].center = (x, y)
-            car_headings[i].set_xdata([x, x + np.cos(heading) * CAR_RADIUS])
-            car_headings[i].set_ydata([y, y + np.sin(heading) * CAR_RADIUS])
+            x_rear_axle, y_rear_axle, heading, _, steering_angle = state_values[t, i, :]
+            x_cog, y_cog = get_center_of_gravity(x_rear_axle, y_rear_axle, heading)
+            cars[i].center = (x_cog, y_cog)
+            front_axles[i].set_xdata([x_cog, x_cog + np.cos(heading + steering_angle) * CAR_RADIUS])
+            front_axles[i].set_ydata([y_cog, y_cog + np.sin(heading + steering_angle) * CAR_RADIUS])
+            rear_axles[i].set_xdata([x_cog, x_cog - np.cos(heading) * CAR_RADIUS])
+            rear_axles[i].set_ydata([y_cog, y_cog - np.sin(heading) * CAR_RADIUS])
         return animated_objects
 
     matplotlib.animation.FuncAnimation(
@@ -155,14 +184,15 @@ def plot_trajectory(state_trajectory, goal_state):
     plt.show()
 
 
-def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
+def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
     """Solves for vehicle trajectory from the start state to the goal state.
 
     Arguments:
       start_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
         Desired start state of the cars.
-      goal_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of Optional[float]
-        Desired final state of the cars.
+      goal_position: (NUM_CARS x 2)-dimensional array of floats
+        Desired final position of the cars. The position is relative to the
+        center of gravity of the each car, not the rear axle of reach car.
       num_time_samples: int
         Number of time samples in the solution. Increasing this number will make
         the solver take longer but will make the output trajectory approximately
@@ -193,21 +223,13 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
     # The initial state trajectory guess will be a linear interpolation from the
     # start state to the goal state.
     TIMESTEP_GUESS = (MAX_TIMESTEP - MIN_TIMESTEP) / 2
-    state_trajectory_guesses = np.empty_like(goal_state)
-    for c in range(NUM_CARS):
-        for j in range(NUM_STATE_DIMENSIONS):
-            if goal_state[c, j] is None:
-                state_trajectory_guesses[c, j] = None
-            else:
-                state_trajectory_guesses[
-                    c, j
-                ] = pydrake.trajectories.PiecewisePolynomial.FirstOrderHold(
+    position_trajectory_guess = pydrake.trajectories.PiecewisePolynomial.FirstOrderHold(
                     [
                         0.0,
                         (time_samples_per_trajectory * num_trajectories)
                         * TIMESTEP_GUESS,
                     ],
-                    np.column_stack((start_state[c, j], goal_state[c, j])),
+                    np.column_stack((start_state[:, :2].flatten(), goal_position.flatten()))
                 )
 
     state_vars = []  # represents state of cars at each time sample
@@ -255,14 +277,12 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
 
         if traj_idx == num_trajectories - 1:
             for c in range(NUM_CARS):
-                for j in range(NUM_STATE_DIMENSIONS):
-                    if goal_state[c, j] is not None:
-                        solver.AddConstraint(
-                            state_vars[-1][-1, c, j] <= goal_state[c, j] + EPSILON
-                        )
-                        solver.AddConstraint(
-                            state_vars[-1][-1, c, j] >= goal_state[c, j] - EPSILON
-                        )
+                x, y, heading, speed = state_vars[-1][-1, c, :4]
+                x_cog, y_cog = get_center_of_gravity(x, y, heading)
+                for coord, goal_coord in [(x_cog, goal_position[c, 0]), (y_cog, goal_position[c, 1]), (speed, 0)]:
+                    solver.AddConstraint(coord >= goal_coord - EPSILON)
+                    solver.AddConstraint(coord <= goal_coord + EPSILON)
+
         else:
             # Constrain sub-trajectory to end with a collision.
             # TODO(tomtseng)
@@ -288,21 +308,17 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
         solver.SetInitialGuess(
             time_vars[-1], np.full_like(a=time_vars[-1], fill_value=TIMESTEP_GUESS)
         )
-        for c in range(NUM_CARS):
-            for j in range(NUM_STATE_DIMENSIONS):
-                if state_trajectory_guesses[c, j] is not None:
-                    solver.SetInitialGuess(
-                        state_vars[-1][:, c, j],
-                        np.array(
-                            [
-                                state_trajectory_guesses[c, j].value(
-                                    ((time_samples_per_trajectory * traj_idx) + t)
-                                    * TIMESTEP_GUESS
-                                )
-                                for t in range(time_samples_per_trajectory + 1)
-                            ]
-                        ).flatten(),
-                    )
+        solver.SetInitialGuess(
+            state_vars[-1][:, :, :2].reshape((time_samples_per_trajectory + 1, NUM_CARS * 2)),
+            np.vstack(
+                [
+                    position_trajectory_guess.value(
+                        ((time_samples_per_trajectory * traj_idx) + t) * TIMESTEP_GUESS
+                    ).T
+                    for t in range(time_samples_per_trajectory + 1)
+                ]
+            ),
+        )
 
     # Penalize solutions that use a lot of time.
     solver.AddCost(sum(sum(ts) for ts in time_vars))
@@ -343,7 +359,7 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
 
         print("Cost: {}".format(solver_result.get_optimal_cost()))
         plot_trajectory(
-            state_trajectory=state_trajectory, goal_state=goal_state,
+            state_trajectory=state_trajectory, goal_position=goal_position,
         )
     else:
         infeasible_constraints = pydrake.solvers.mathematicalprogram.GetInfeasibleConstraints(
@@ -358,15 +374,13 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
 
 if __name__ == "__main__":
     START_STATE = np.array([[0, 0, 0, 0, 0], [4, -3, np.pi / 4, 0, 0]])
-    # Don't enforce heading on goal state since headings modulo 2 * pi are
-    # indistinguishable.
-    GOAL_STATE = np.array([[6, 2, None, 0, 0], [3, 3, None, 0, 0]])
+    GOAL_POSITION = np.array([[6, 2], [3, 3]])
     NUM_TIME_SAMPLES = 20
     COLLISION_SEQUENCE = []
 
     solve(
         start_state=START_STATE,
-        goal_state=GOAL_STATE,
+        goal_position=GOAL_POSITION,
         num_time_samples=NUM_TIME_SAMPLES,
         collision_sequence=COLLISION_SEQUENCE,
     )
