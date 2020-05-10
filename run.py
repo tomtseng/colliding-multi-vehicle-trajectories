@@ -22,6 +22,7 @@ MAX_ACCELERATION = 3.9  # m/s^2
 MAX_STEERING_ANGLE = np.pi / 4  # radians
 MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
 
+EPSILON = 1e-2
 SECONDS_TO_MILLISECONDS = 1000
 
 
@@ -181,6 +182,9 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
     )
 
     solver = pydrake.solvers.mathematicalprogram.MathematicalProgram()
+    solver.SetSolverOption(pydrake.solvers.mathematicalprogram.SolverType.kSnopt, "Print file", "/tmp/snopt-output.txt")
+    solver.SetSolverOption(pydrake.solvers.mathematicalprogram.SolverType.kSnopt, "Major iterations limit", 10000)
+    solver.SetSolverOption(pydrake.solvers.mathematicalprogram.SolverType.kSnopt, "Iterations limit", 100000)
 
     # Solve for the trajectory as a sequence of collision-free sub-trajectories.
     num_trajectories = len(collision_sequence) + 1
@@ -254,7 +258,10 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
                 for j in range(NUM_STATE_DIMENSIONS):
                     if goal_state[c, j] is not None:
                         solver.AddConstraint(
-                            state_vars[-1][-1, c, j] == goal_state[c, j]
+                            state_vars[-1][-1, c, j] <= goal_state[c, j] + EPSILON
+                        )
+                        solver.AddConstraint(
+                            state_vars[-1][-1, c, j] >= goal_state[c, j] - EPSILON
                         )
         else:
             # Constrain sub-trajectory to end with a collision.
@@ -343,6 +350,7 @@ def solve(start_state, goal_state, num_time_samples, collision_sequence=[]):
             solver, solver_result
         )
         print("Failed to solve.")
+        print(solver_result.get_solution_result())
         print("Infeasible constraints:")
         for constraint in infeasible_constraints:
             print(constraint)
@@ -353,7 +361,7 @@ if __name__ == "__main__":
     # Don't enforce heading on goal state since headings modulo 2 * pi are
     # indistinguishable.
     GOAL_STATE = np.array([[6, 2, None, 0, 0], [3, 3, None, 0, 0]])
-    NUM_TIME_SAMPLES = 50
+    NUM_TIME_SAMPLES = 20
     COLLISION_SEQUENCE = []
 
     solve(
