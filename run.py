@@ -21,13 +21,10 @@ NUM_CARS = 2
 CAR_COLORS = ["r", "b"]
 # control for a car is [acceleration, steering angle]
 NUM_CONTROL_DIMENSIONS = 2
-# state for a car is [x position, y position, heading, linear speed, steering
-# angle].
-# The state uses the rear axle as its reference frame; the heading is the
-# direction of the rear wheel, the linear speed is the speed of the rear wheel
-# in the heading direction, and the steering angle is the front axle angle
-# relative to the heading.
-NUM_STATE_DIMENSIONS = 5
+# state for a car is [x position of rear axle, y position of rear axle, heading,
+# speed in direction of heading, speed perpendicular to the heading, steering
+# angle of front axle relative to heading].
+NUM_STATE_DIMENSIONS = 6
 NUM_POSITION_DIMENSIONS = 2  # x, y
 
 CAR_RADIUS = 0.9  # meters
@@ -40,6 +37,8 @@ AXLE_TO_AXLE_LENGTH = COG_TO_FRONT_AXLE_LENGTH + COG_TO_REAR_AXLE_LENGTH  # mete
 MAX_ACCELERATION = 3.9  # m/s^2
 MAX_STEERING_ANGLE = np.pi / 4  # radians
 MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
+G = 9.8  # m/s^2
+CORNERING_COEFFICIENT = 0.08 * G  # m/s^2
 
 EPSILON = 1e-2
 SECONDS_TO_MILLISECONDS = 1000
@@ -51,6 +50,8 @@ def CarsSystem_(T):
 
     Code modeled after
     https://github.com/RussTedrake/underactuated/blob/ae1832c9c3048a0a154d201e4ab6c4fe9555f666/underactuated/quadrotor2d.py
+
+    The TemplateSystem template is to support automatic differentiation.
     """
 
     class Impl(pydrake.systems.framework.LeafSystem_[T]):
@@ -96,13 +97,36 @@ def CarsSystem_(T):
 
             change_in_state = np.empty_like(state)
             for i in range(NUM_CARS):
-                heading, speed, steering_angle = state[i, 2:5]
-                change_in_state[i, 0] = speed * np.cos(heading)
-                change_in_state[i, 1] = speed * np.sin(heading)
-                change_in_state[i, 2] = (
-                    speed * np.tan(steering_angle) / AXLE_TO_AXLE_LENGTH
+                heading, forward_speed, lateral_speed, steering_angle = state[i, 2:]
+                forward_acceleration, steering_velocity = control[i]
+
+                change_in_x = forward_speed * np.cos(heading) - lateral_speed * np.sin(
+                    heading
                 )
-            change_in_state[:, 3:] = control
+                change_in_y = forward_speed * np.sin(heading) + lateral_speed * np.cos(
+                    heading
+                )
+                change_in_heading = (
+                    forward_speed * np.tan(steering_angle) / AXLE_TO_AXLE_LENGTH
+                )
+                change_in_forward_speed = (
+                    forward_acceleration + lateral_speed * change_in_heading
+                )
+                # The EPSILON term is to resolve numerical difficulties in using arctan2, which has a branch cut, in a solver
+                change_in_lateral_speed = -CORNERING_COEFFICIENT * np.arctan2(
+                    lateral_speed, EPSILON + np.abs(forward_speed)
+                )
+                change_in_steering_angle = steering_velocity
+                change_in_state[i, :] = np.array(
+                    [
+                        change_in_x,
+                        change_in_y,
+                        change_in_heading,
+                        change_in_forward_speed,
+                        change_in_lateral_speed,
+                        change_in_steering_angle,
+                    ]
+                )
             derivatives.get_mutable_vector().SetFromVector(change_in_state.flatten())
 
     return Impl
@@ -176,7 +200,9 @@ def plot_trajectory(state_trajectory, goal_position):
 
     def animate(t):
         for i in range(NUM_CARS):
-            x_rear_axle, y_rear_axle, heading, _, steering_angle = state_values[t, i, :]
+            x_rear_axle, y_rear_axle, heading, _, _, steering_angle = state_values[
+                t, i, :
+            ]
             x_cog, y_cog = get_center_of_gravity(
                 x_rear_axle=x_rear_axle, y_rear_axle=y_rear_axle, heading=heading
             )
@@ -251,6 +277,10 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
         "Major iterations limit",
         SNOPT_MAJOR_ITERATIONS_LIMIT,
     )
+    # Normalizes constraints and variables. This seems to give better solutions.
+    solver.SetSolverOption(
+        pydrake.solvers.mathematicalprogram.SolverType.kSnopt, "Scale option", 2
+    )
 
     # Solve for the trajectory as a sequence of collision-free sub-trajectories.
     num_trajectories = len(collision_sequence) + 1
@@ -271,36 +301,42 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
         state_vars.append(
             solver.NewContinuousVariables(
                 (time_samples_per_trajectory + 1) * NUM_CARS * NUM_STATE_DIMENSIONS,
-                name="state" + str(traj_idx),
+                name="traj {}: state".format(traj_idx),
             ).reshape((time_samples_per_trajectory + 1, NUM_CARS, NUM_STATE_DIMENSIONS))
         )
         control_vars.append(
             solver.NewContinuousVariables(
                 (time_samples_per_trajectory + 1) * NUM_CARS * NUM_CONTROL_DIMENSIONS,
-                name="control" + str(traj_idx),
+                name="traj {}: control".format(traj_idx),
             ).reshape(
                 (time_samples_per_trajectory + 1, NUM_CARS, NUM_CONTROL_DIMENSIONS)
             )
         )
         time_vars.append(
             solver.NewContinuousVariables(
-                time_samples_per_trajectory, name="time" + str(traj_idx)
+                time_samples_per_trajectory, name="traj {}: time".format(traj_idx)
             )
         )
 
-        solver.AddBoundingBoxConstraint(MIN_TIMESTEP, MAX_TIMESTEP, time_vars[-1])
         solver.AddBoundingBoxConstraint(
-            -MAX_STEERING_ANGLE, MAX_STEERING_ANGLE, state_vars[-1][:, :, 4]
-        )
+            MIN_TIMESTEP, MAX_TIMESTEP, time_vars[-1]
+        ).evaluator().set_description("traj {}: timestep bounds".format(traj_idx))
+        solver.AddBoundingBoxConstraint(
+            -MAX_STEERING_ANGLE, MAX_STEERING_ANGLE, state_vars[-1][:, :, 5]
+        ).evaluator().set_description("traj {}: steering angle bounds".format(traj_idx))
         solver.AddBoundingBoxConstraint(
             -MAX_ACCELERATION, MAX_ACCELERATION, control_vars[-1][:, :, 0]
-        )
+        ).evaluator().set_description("traj {}: acceleration bounds".format(traj_idx))
         solver.AddBoundingBoxConstraint(
             -MAX_STEERING_VELOCITY, MAX_STEERING_VELOCITY, control_vars[-1][:, :, 1]
+        ).evaluator().set_description(
+            "traj {}: steering velocity bounds".format(traj_idx)
         )
 
         if traj_idx == 0:
-            solver.AddConstraint(pydrake.math.eq(state_vars[-1][0], start_state))
+            solver.AddConstraint(
+                pydrake.math.eq(state_vars[-1][0], start_state)
+            ).evaluator().set_description("traj {}: start".format(traj_idx))
         else:
             # Constrain start of the sub-trajectory to be the result of a
             # collision at the end of the previous trajectory.
@@ -308,18 +344,28 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
             pass
 
         if traj_idx == num_trajectories - 1:
+            # Constraint last sub-trajectory to end at goal state
             for c in range(NUM_CARS):
-                x, y, heading, speed = state_vars[-1][-1, c, :4]
+                x, y, heading, forward_speed, lateral_speed = state_vars[-1][-1, c, :5]
                 x_cog, y_cog = get_center_of_gravity(
                     x_rear_axle=x, y_rear_axle=y, heading=heading
                 )
                 for coord, goal_coord in [
                     (x_cog, goal_position[c, 0]),
                     (y_cog, goal_position[c, 1]),
-                    (speed, 0),
+                    (forward_speed, 0),
+                    (lateral_speed, 0),
                 ]:
-                    solver.AddConstraint(coord >= goal_coord - EPSILON)
-                    solver.AddConstraint(coord <= goal_coord + EPSILON)
+                    solver.AddConstraint(
+                        coord >= goal_coord - EPSILON
+                    ).evaluator().set_description(
+                        "traj {}: finish at goal - lower bound".format(traj_idx)
+                    )
+                    solver.AddConstraint(
+                        coord <= goal_coord + EPSILON
+                    ).evaluator().set_description(
+                        "traj {}: finish at goal - upper bound".format(traj_idx)
+                    )
 
         else:
             # Constrain sub-trajectory to end with a collision.
@@ -335,6 +381,8 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
                 input=control_vars[-1][t].flatten(),
                 next_input=control_vars[-1][t + 1].flatten(),
                 prog=solver,
+            ).evaluator().set_description(
+                "traj {}: time sample {}: direct collocation".format(traj_idx, t)
             )
 
         # Don't allow collisions within a sub-trajectory.
@@ -352,7 +400,13 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
                     distance_squared = (x_cog_1 - x_cog_2) ** 2 + (
                         y_cog_1 - y_cog_2
                     ) ** 2
-                    solver.AddConstraint(distance_squared >= (2 * CAR_RADIUS) ** 2)
+                    solver.AddConstraint(
+                        distance_squared >= (2 * CAR_RADIUS) ** 2
+                    ).evaluator().set_description(
+                        "traj {}: time sample {}: avoid collision {}<->{}".format(
+                            traj_idx, t, i, j
+                        )
+                    )
 
         solver.SetInitialGuess(
             time_vars[-1], np.full_like(a=time_vars[-1], fill_value=TIMESTEP_GUESS)
@@ -427,7 +481,7 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
 
 
 if __name__ == "__main__":
-    START_STATE = np.array([[0, 0, 0, 0, 0], [4, -3, np.pi / 4, 0, 0]])
+    START_STATE = np.array([[0, 0, 0, 0, 0, 0], [4, -3, np.pi / 4, 0, 0, 0]])
     GOAL_CENTER_OF_GRAVITY_POSITION = np.array([[6, 2], [3, 3]])
     NUM_TIME_SAMPLES = 30
     COLLISION_SEQUENCE = []
