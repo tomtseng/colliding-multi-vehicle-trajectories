@@ -33,7 +33,9 @@ NUM_POSITION_DIMENSIONS = 2  # x, y
 CAR_RADIUS = 0.9  # meters
 # COG = center of gravity. The center of gravity of a car is assumed to be at
 # the center of the circle representing the car.
+COG_TO_FRONT_AXLE_LENGTH = 0.6  # meters
 COG_TO_REAR_AXLE_LENGTH = 0.6  # meters
+AXLE_TO_AXLE_LENGTH = COG_TO_FRONT_AXLE_LENGTH + COG_TO_REAR_AXLE_LENGTH  # meters
 
 MAX_ACCELERATION = 3.9  # m/s^2
 MAX_STEERING_ANGLE = np.pi / 4  # radians
@@ -97,7 +99,9 @@ def CarsSystem_(T):
                 heading, speed, steering_angle = state[i, 2:5]
                 change_in_state[i, 0] = speed * np.cos(heading)
                 change_in_state[i, 1] = speed * np.sin(heading)
-                change_in_state[i, 2] = speed * np.tan(steering_angle)
+                change_in_state[i, 2] = (
+                    speed * np.tan(steering_angle) / AXLE_TO_AXLE_LENGTH
+                )
             change_in_state[:, 3:] = control
             derivatives.get_mutable_vector().SetFromVector(change_in_state.flatten())
 
