@@ -357,8 +357,8 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
     MIN_TIMESTEP = 0.005  # seconds
     MAX_TIMESTEP = 0.2  # seconds
     SOLVER_OUTPUT_FILE = "/tmp/snopt-output.txt"
-    SNOPT_ITERATIONS_LIMIT = 300000  # default is 10000
-    SNOPT_MAJOR_ITERATIONS_LIMIT = 30000  # default is 1000
+    SNOPT_ITERATIONS_LIMIT = 100000  # default is 10000
+    SNOPT_MAJOR_ITERATIONS_LIMIT = 10000  # default is 1000
 
     cars_system = CarsSystem_[None]()
     system_context = cars_system.CreateDefaultContext()
@@ -600,10 +600,12 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
 
 
 if __name__ == "__main__":
-    START_STATE = np.array([[0, 0, 0, 0, 0, 0], [4, -3, np.pi / 2, 0, 0, 0]])
-    GOAL_CENTER_OF_GRAVITY_POSITION = np.array([[6, 2], [3, 3]])
-    NUM_TIME_SAMPLES = 40
+    START_STATE = np.array(
+        [[-4.5, -6, np.pi / 2, 0, 0, 0], [4.5, 6, -np.pi / 2, 0, 0, 0]]
+    )
+    GOAL_CENTER_OF_GRAVITY_POSITION = np.array([[-1, -1], [1, 1]])
     COLLISION_SEQUENCE = [(0, 1)]
+    NUM_TIME_SAMPLES = 40
 
     solve(
         start_state=START_STATE,
