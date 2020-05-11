@@ -172,9 +172,11 @@ def plot_trajectory(state_trajectory, goal_position):
     rear_axles = [matplotlib.lines.Line2D([], [], color="k") for i in range(NUM_CARS)]
     for rear_axle in rear_axles:
         ax.add_line(rear_axle)
-    animated_objects = cars + rear_axles + front_axles
+    time_text = ax.text(0.01, 0.01, "", fontsize=12, transform=ax.transAxes)
+    animated_objects = cars + rear_axles + front_axles + [time_text]
 
     def animate(t):
+        time_text.set_text("time = {:.2f}s".format(t * TIMESTEP))
         for i in range(NUM_CARS):
             x_rear_axle, y_rear_axle, heading, _, steering_angle = state_values[t, i, :]
             x_cog, y_cog = get_center_of_gravity(
