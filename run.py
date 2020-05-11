@@ -18,7 +18,7 @@ import pydrake.trajectories
 
 NUM_CARS = 2
 # Color for each car in the animation.
-CAR_COLORS = ["r", "b"]
+CAR_COLORS = ["r", "b", "g"]
 # control for a car is [acceleration, steering angle]
 NUM_CONTROL_DIMENSIONS = 2
 # state for a car is [x position of rear axle, y position of rear axle, heading,
@@ -28,7 +28,7 @@ NUM_STATE_DIMENSIONS = 6
 NUM_POSITION_DIMENSIONS = 2  # x, y
 
 CAR_RADIUS = 0.9  # meters
-CAR_MASSES = [1300, 1300]  # kg
+CAR_MASSES = [1300, 1300, 1300]  # kg
 # COG = center of gravity. The center of gravity of a car is assumed to be at
 # the center of the circle representing the car.
 COG_TO_FRONT_AXLE_LENGTH = 0.6  # meters
@@ -357,8 +357,8 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
     MIN_TIMESTEP = 0.005  # seconds
     MAX_TIMESTEP = 0.2  # seconds
     SOLVER_OUTPUT_FILE = "/tmp/snopt-output.txt"
-    SNOPT_ITERATIONS_LIMIT = 100000  # default is 10000
-    SNOPT_MAJOR_ITERATIONS_LIMIT = 10000  # default is 1000
+    SNOPT_ITERATIONS_LIMIT = 300000  # default is 10000
+    SNOPT_MAJOR_ITERATIONS_LIMIT = 30000  # default is 1000
 
     cars_system = CarsSystem_[None]()
     system_context = cars_system.CreateDefaultContext()
@@ -524,6 +524,11 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
 
         solver.SetInitialGuess(
             time_vars[-1], np.full_like(a=time_vars[-1], fill_value=TIMESTEP_GUESS)
+        )
+        LATERAL_SPEED_GUESS = 0
+        solver.SetInitialGuess(
+            state_vars[-1][:, :, 4],
+            np.full_like(a=state_vars[-1][:, :, 4], fill_value=LATERAL_SPEED_GUESS),
         )
         solver.SetInitialGuess(
             state_vars[-1][:, :, :NUM_POSITION_DIMENSIONS].reshape(
