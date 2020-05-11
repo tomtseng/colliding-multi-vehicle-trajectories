@@ -22,6 +22,9 @@ source venv/bin/activate
 
 ## Run the animation
 
+To produce an animation, run the following command:
 ```sh
 python3 run.py
 ```
+
+See the file comment on run.py to change the vehicle start and stop locations.

@@ -1,6 +1,32 @@
 """
 Searches for an approximate trajectory for several circular cars to get from a
-start location to an end location.
+start location to an end location, then displays an animation illustrating the
+trajectory.
+
+To change the trajectory that this program searches for, change the constants in
+`run_main()`.
+
+The trajectory optimization in this program leaves a lot to be desired. It often
+returns local optima that clearly could be improved, and it often hits numerical
+issues and fails to solve.
+
+The trajectory optimization can handle more cars if the `NUM_CARS` constant and
+the constants in `run_main()` are adjusted appropriately, but such trajectories
+take a long time to solve for, and the solver seems to encounter numerical
+issues annoyingly often.
+
+Here's an example of a situation with three cars for which the solver can find a
+trajectory:
+    START_STATE = np.array(
+        [
+            [-1, 0, 0, 2, 0, 0],
+            [2.5, -2, np.pi / 2, 0, 0, 0],
+            [4, 4, 3 * np.pi / 2, 0, 0, 0],
+        ]
+    )
+    GOAL_CENTER_OF_GRAVITY_POSITION = np.array([[0, 0], [7, 3], [2, 1]])
+    COLLISION_SEQUENCE = [(0, 1), (1, 2)]
+    NUM_TIME_SAMPLES = 40
 """
 #!/usr/bin/env python3
 
@@ -21,7 +47,7 @@ NUM_CARS = 2
 CAR_COLORS = ["r", "b", "g"]
 # control for a car is [acceleration, steering angle]
 NUM_CONTROL_DIMENSIONS = 2
-# state for a car is [x position of rear axle, y position of rear axle, heading,
+# State for a car is [x position of rear axle, y position of rear axle, heading,
 # speed in direction of heading, speed perpendicular to the heading, steering
 # angle of front axle relative to heading].
 NUM_STATE_DIMENSIONS = 6
@@ -337,18 +363,28 @@ def plot_trajectory(state_trajectory, goal_position):
 
 
 def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
-    """Solves for vehicle trajectory from the start state to the goal state.
+    """Solves for an approximate vehicle trajectory from the start state to the
+    goal state.
+
+    The solver tries to minimize the time for all cars to get to their goal
+    position. (It can be mildly entertaining to remove the `solver.AddCost(...)`
+    statement and observe the meandering trajectories produced. Removing that
+    statement is also useful for more quickly checking if there's any hope of
+    the solver finding a feasible trajectory.)
 
     Arguments:
       start_state: (NUM_CARS x NUM_STATE_DIMENSIONS)-dimensional array of floats
         Desired start state of the cars.
       goal_position: (NUM_CARS x NUM_POSITION_DIMENSIONS)-dimensional array of floats
         Desired final position of the cars. The position is relative to the
-        center of gravity of the each car, not the rear axle of reach car.
+        center of gravity of each car, not the rear axle of each car like in the
+        car state.
       num_time_samples: int
         Number of time samples in the solution. Increasing this number will make
-        the solver take longer but will make the output trajectory approximately
-        follow the dynamics and state/control constraints more closely.
+        the solver take longer but will make the output trajectory follow the
+        vehicle dynamics and constraints more closely. Also, there is a minimum
+        interval between time samples, so setting this argument to a huge number
+        will result in slow trajectories.
       collision_sequence: List[Tuple[int, int]]
         The collisions that will happen in this trajectory in order. A collision
         is specified by a pair of cars that will collide.
@@ -599,12 +635,18 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
             print(constraint)
 
 
-if __name__ == "__main__":
+def run_main():
+    # Start state for each car. See comment above `NUM_STATE_DIMENSIONS` for a
+    # description of the state variables.
     START_STATE = np.array(
         [[-4.5, -6, np.pi / 2, 0, 0, 0], [4.5, 6, -np.pi / 2, 0, 0, 0]]
     )
+    # Goal position for each car.
     GOAL_CENTER_OF_GRAVITY_POSITION = np.array([[-1, -1], [1, 1]])
+    # The collisions between cars must be specified up front. See function
+    # comment of `solve()`.
     COLLISION_SEQUENCE = [(0, 1)]
+    # See function comment of `solve()`.
     NUM_TIME_SAMPLES = 40
 
     solve(
@@ -613,3 +655,7 @@ if __name__ == "__main__":
         num_time_samples=NUM_TIME_SAMPLES,
         collision_sequence=COLLISION_SEQUENCE,
     )
+
+
+if __name__ == "__main__":
+    run_main()
