@@ -38,9 +38,8 @@ AXLE_TO_AXLE_LENGTH = COG_TO_FRONT_AXLE_LENGTH + COG_TO_REAR_AXLE_LENGTH  # mete
 MAX_ACCELERATION = 3.9  # m/s^2
 MAX_STEERING_ANGLE = np.pi / 4  # radians
 MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
-G = 9.8  # m/s^2
 # Determines how fast lateral speed decays.
-CORNERING_COEFFICIENT = 0.08 * G  # m/s^2
+CORNERING_COEFFICIENT = 5
 # Coefficient of restitution; determines the elasticity of car collisions
 RESTITUTION_COEFFICIENT = 0.1
 
@@ -215,16 +214,16 @@ def add_collision_constraint(solver, prev_state, next_state, car_1, car_2):
     next_speed_towards_collision_1 = (
         RESTITUTION_COEFFICIENT
         * relative_mass_2
-        * (prev_speed_towards_collision_2 - prev_speed_towards_collision_1)
+        * (-prev_speed_towards_collision_2 - prev_speed_towards_collision_1)
         + relative_mass_1 * prev_speed_towards_collision_1
-        + relative_mass_2 * prev_speed_towards_collision_2
+        + relative_mass_2 * -prev_speed_towards_collision_2
     )
     next_speed_lateral_collision_1 = prev_speed_lateral_collision_1
     next_speed_towards_collision_2 = (
         RESTITUTION_COEFFICIENT
         * relative_mass_1
-        * (prev_speed_towards_collision_1 - prev_speed_towards_collision_2)
-        + relative_mass_1 * prev_speed_towards_collision_1
+        * (-prev_speed_towards_collision_1 - prev_speed_towards_collision_2)
+        + relative_mass_1 * -prev_speed_towards_collision_1
         + relative_mass_2 * prev_speed_towards_collision_2
     )
     next_speed_lateral_collision_2 = prev_speed_lateral_collision_2
