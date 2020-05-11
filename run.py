@@ -253,6 +253,10 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
         "Major iterations limit",
         SNOPT_MAJOR_ITERATIONS_LIMIT,
     )
+    # Normalizes constraints and variables. This seems to give better solutions.
+    solver.SetSolverOption(
+        pydrake.solvers.mathematicalprogram.SolverType.kSnopt, "Scale option", 2
+    )
 
     # Solve for the trajectory as a sequence of collision-free sub-trajectories.
     num_trajectories = len(collision_sequence) + 1
