@@ -210,21 +210,23 @@ def add_collision_constraint(solver, prev_state, next_state, car_1, car_2):
     ) + lateral_speed_2 * np.cos(collision_angle_2)
 
     mass_1, mass_2 = CAR_MASSES[car_1], CAR_MASSES[car_2]
+    relative_mass_1 = mass_1 / (mass_1 + mass_2)
+    relative_mass_2 = mass_2 / (mass_1 + mass_2)
     next_speed_towards_collision_1 = (
         RESTITUTION_COEFFICIENT
-        * mass_2
+        * relative_mass_2
         * (prev_speed_towards_collision_2 - prev_speed_towards_collision_1)
-        + mass_1 * prev_speed_towards_collision_1
-        + mass_2 * prev_speed_towards_collision_2
-    ) / (mass_1 + mass_2)
+        + relative_mass_1 * prev_speed_towards_collision_1
+        + relative_mass_2 * prev_speed_towards_collision_2
+    )
     next_speed_lateral_collision_1 = prev_speed_lateral_collision_1
     next_speed_towards_collision_2 = (
         RESTITUTION_COEFFICIENT
-        * mass_1
+        * relative_mass_1
         * (prev_speed_towards_collision_1 - prev_speed_towards_collision_2)
-        + mass_1 * prev_speed_towards_collision_1
-        + mass_2 * prev_speed_towards_collision_2
-    ) / (mass_1 + mass_2)
+        + relative_mass_1 * prev_speed_towards_collision_1
+        + relative_mass_2 * prev_speed_towards_collision_2
+    )
     next_speed_lateral_collision_2 = prev_speed_lateral_collision_2
 
     next_forward_speed_1 = next_speed_towards_collision_1 * np.cos(
@@ -348,7 +350,7 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
         is specified by a pair of cars that will collide.
     """
     # Bounds on time step on each time sample
-    MIN_TIMESTEP = 0.01  # seconds
+    MIN_TIMESTEP = 0.001  # seconds
     MAX_TIMESTEP = 0.2  # seconds
     SOLVER_OUTPUT_FILE = "/tmp/snopt-output.txt"
     SNOPT_ITERATIONS_LIMIT = 100000  # default is 10000
