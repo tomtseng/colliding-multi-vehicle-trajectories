@@ -134,6 +134,7 @@ def plot_trajectory(state_trajectory, goal_position):
     """
     FRAME_RATE = 25  # 1/s
     TIMESTEP = 1 / FRAME_RATE  # s
+    ANIMATION_OUTPUT_FILE = "/tmp/animation-output.gif"
 
     fig, ax = plt.subplots()
     ax.set_aspect("equal")
@@ -193,7 +194,7 @@ def plot_trajectory(state_trajectory, goal_position):
             rear_axles[i].set_ydata([y_cog, y_cog - np.sin(heading) * CAR_RADIUS])
         return animated_objects
 
-    matplotlib.animation.FuncAnimation(
+    animation = matplotlib.animation.FuncAnimation(
         fig,
         animate,
         init_func=lambda: [],
@@ -203,6 +204,10 @@ def plot_trajectory(state_trajectory, goal_position):
     )
 
     plt.show()
+    should_save = input("Save animation? Enter a string starting with 'y' to save: ")
+    if len(should_save) > 0 and should_save[0] == "y":
+        print("Saving animation to {}...".format(ANIMATION_OUTPUT_FILE))
+        animation.save(ANIMATION_OUTPUT_FILE, writer="imagemagick", fps=FRAME_RATE)
 
 
 def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
