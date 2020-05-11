@@ -28,6 +28,7 @@ NUM_STATE_DIMENSIONS = 6
 NUM_POSITION_DIMENSIONS = 2  # x, y
 
 CAR_RADIUS = 0.9  # meters
+CAR_MASSES = [1300, 1300]  # kg
 # COG = center of gravity. The center of gravity of a car is assumed to be at
 # the center of the circle representing the car.
 COG_TO_FRONT_AXLE_LENGTH = 0.6  # meters
@@ -38,7 +39,10 @@ MAX_ACCELERATION = 3.9  # m/s^2
 MAX_STEERING_ANGLE = np.pi / 4  # radians
 MAX_STEERING_VELOCITY = np.pi / 2  # radians/s
 G = 9.8  # m/s^2
+# Determines how fast lateral speed decays.
 CORNERING_COEFFICIENT = 0.08 * G  # m/s^2
+# Coefficient of restitution; determines the elasticity of car collisions
+RESTITUTION_COEFFICIENT = 0.1
 
 EPSILON = 1e-2
 SECONDS_TO_MILLISECONDS = 1000
@@ -145,6 +149,101 @@ def get_center_of_gravity(x_rear_axle, y_rear_axle, heading):
         x_rear_axle + COG_TO_REAR_AXLE_LENGTH * m.cos(heading),
         y_rear_axle + COG_TO_REAR_AXLE_LENGTH * m.sin(heading),
     )
+
+
+def squared_distance_of_centers_of_gravity(current_state, car_1, car_2):
+    """Computes the squared distance between the centers of two cars in the
+    current state.
+    """
+    x_1, y_1, heading_1 = current_state[car_1, :3]
+    x_cog_1, y_cog_1 = get_center_of_gravity(
+        x_rear_axle=x_1, y_rear_axle=y_1, heading=heading_1
+    )
+    x_2, y_2, heading_2 = current_state[car_2, :3]
+    x_cog_2, y_cog_2 = get_center_of_gravity(
+        x_rear_axle=x_2, y_rear_axle=y_2, heading=heading_2
+    )
+    return (x_cog_1 - x_cog_2) ** 2 + (y_cog_1 - y_cog_2) ** 2
+
+
+def add_collision_constraint(solver, prev_state, next_state, car_1, car_2):
+    """Adds solver constraint that next_state is equal to prev_state after a
+    collision between car_1 and car_2.
+    """
+    for i in range(NUM_CARS):
+        if i != car_1 and i != car_2:
+            solver.AddConstraint(pydrake.math.eq(prev_state[i], next_state[i]))
+
+    UNCHANGED_COORDINATES = [0, 1, 2, 5]
+    for car in [car_1, car_2]:
+        solver.AddConstraint(
+            pydrake.math.eq(
+                prev_state[car, UNCHANGED_COORDINATES],
+                next_state[car, UNCHANGED_COORDINATES],
+            )
+        )
+
+    x_1, y_1, heading_1, forward_speed_1, lateral_speed_1 = prev_state[car_1, :5]
+    x_cog_1, y_cog_1 = get_center_of_gravity(
+        x_rear_axle=x_1, y_rear_axle=y_1, heading=heading_1
+    )
+    x_2, y_2, heading_2, forward_speed_2, lateral_speed_2 = prev_state[car_2, :5]
+    x_cog_2, y_cog_2 = get_center_of_gravity(
+        x_rear_axle=x_2, y_rear_axle=y_2, heading=heading_2
+    )
+
+    absolute_collision_angle = np.arctan2(y_cog_2 - y_cog_1, x_cog_2 - x_cog_1)
+
+    collision_angle_1 = absolute_collision_angle - heading_1
+    prev_speed_towards_collision_1 = forward_speed_1 * np.cos(
+        collision_angle_1
+    ) + lateral_speed_1 * np.sin(collision_angle_1)
+    prev_speed_lateral_collision_1 = -forward_speed_1 * np.sin(
+        collision_angle_1
+    ) + lateral_speed_1 * np.cos(collision_angle_1)
+    collision_angle_2 = np.pi + absolute_collision_angle - heading_2
+    prev_speed_towards_collision_2 = forward_speed_2 * np.cos(
+        collision_angle_2
+    ) + lateral_speed_2 * np.sin(collision_angle_2)
+    prev_speed_lateral_collision_2 = -forward_speed_2 * np.sin(
+        collision_angle_2
+    ) + lateral_speed_2 * np.cos(collision_angle_2)
+
+    mass_1, mass_2 = CAR_MASSES[car_1], CAR_MASSES[car_2]
+    next_speed_towards_collision_1 = (
+        RESTITUTION_COEFFICIENT
+        * mass_2
+        * (prev_speed_towards_collision_2 - prev_speed_towards_collision_1)
+        + mass_1 * prev_speed_towards_collision_1
+        + mass_2 * prev_speed_towards_collision_2
+    ) / (mass_1 + mass_2)
+    next_speed_lateral_collision_1 = prev_speed_lateral_collision_1
+    next_speed_towards_collision_2 = (
+        RESTITUTION_COEFFICIENT
+        * mass_1
+        * (prev_speed_towards_collision_1 - prev_speed_towards_collision_2)
+        + mass_1 * prev_speed_towards_collision_1
+        + mass_2 * prev_speed_towards_collision_2
+    ) / (mass_1 + mass_2)
+    next_speed_lateral_collision_2 = prev_speed_lateral_collision_2
+
+    next_forward_speed_1 = next_speed_towards_collision_1 * np.cos(
+        collision_angle_1
+    ) - next_speed_lateral_collision_1 * np.sin(collision_angle_1)
+    next_lateral_speed_1 = next_speed_towards_collision_1 * np.sin(
+        collision_angle_1
+    ) + next_speed_lateral_collision_1 * np.cos(collision_angle_1)
+    next_forward_speed_2 = next_speed_towards_collision_2 * np.cos(
+        collision_angle_2
+    ) - next_speed_lateral_collision_2 * np.sin(collision_angle_2)
+    next_lateral_speed_2 = next_speed_towards_collision_2 * np.sin(
+        collision_angle_2
+    ) + next_speed_lateral_collision_2 * np.cos(collision_angle_2)
+
+    solver.AddConstraint(next_state[car_1, 3] == next_forward_speed_1)
+    solver.AddConstraint(next_state[car_1, 4] == next_lateral_speed_1)
+    solver.AddConstraint(next_state[car_2, 3] == next_forward_speed_2)
+    solver.AddConstraint(next_state[car_2, 4] == next_lateral_speed_2)
 
 
 def plot_trajectory(state_trajectory, goal_position):
@@ -290,7 +389,7 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
     # start state to the goal state.
     TIMESTEP_GUESS = (MAX_TIMESTEP - MIN_TIMESTEP) / 2
     position_trajectory_guess = pydrake.trajectories.PiecewisePolynomial.FirstOrderHold(
-        [0.0, (time_samples_per_trajectory * num_trajectories) * TIMESTEP_GUESS,],
+        [0.0, (time_samples_per_trajectory * num_trajectories) * TIMESTEP_GUESS],
         np.column_stack((start_state[:, :2].flatten(), goal_position.flatten())),
     )
 
@@ -340,11 +439,17 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
         else:
             # Constrain start of the sub-trajectory to be the result of a
             # collision at the end of the previous trajectory.
-            # TODO(tomtseng)
-            pass
+            car_1, car_2 = collision_sequence[traj_idx - 1]
+            add_collision_constraint(
+                solver,
+                prev_state=state_vars[-2][-1],
+                next_state=state_vars[-1][0],
+                car_1=car_1,
+                car_2=car_2,
+            )
 
         if traj_idx == num_trajectories - 1:
-            # Constraint last sub-trajectory to end at goal state
+            # Constrain last sub-trajectory to end at goal state
             for c in range(NUM_CARS):
                 x, y, heading, forward_speed, lateral_speed = state_vars[-1][-1, c, :5]
                 x_cog, y_cog = get_center_of_gravity(
@@ -369,8 +474,17 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
 
         else:
             # Constrain sub-trajectory to end with a collision.
-            # TODO(tomtseng)
-            pass
+            car_1, car_2 = collision_sequence[traj_idx]
+            squared_distance = squared_distance_of_centers_of_gravity(
+                current_state=state_vars[-1][-1], car_1=car_1, car_2=car_2
+            )
+            solver.AddConstraint(
+                squared_distance == (2 * CAR_RADIUS) ** 2
+            ).evaluator().set_description(
+                "traj {}: enforce collision {}<->{} at finish".format(
+                    traj_idx, car_1, car_2
+                )
+            )
 
         for t in range(time_samples_per_trajectory):
             pydrake.systems.trajectory_optimization.AddDirectCollocationConstraint(
@@ -388,20 +502,12 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
         # Don't allow collisions within a sub-trajectory.
         for t in range(time_samples_per_trajectory):
             for i in range(NUM_CARS):
-                x_1, y_1, heading_1 = state_vars[-1][t, i, :3]
-                x_cog_1, y_cog_1 = get_center_of_gravity(
-                    x_rear_axle=x_1, y_rear_axle=y_1, heading=heading_1
-                )
                 for j in range(i + 1, NUM_CARS):
-                    x_2, y_2, heading_2 = state_vars[-1][t, j, :3]
-                    x_cog_2, y_cog_2 = get_center_of_gravity(
-                        x_rear_axle=x_2, y_rear_axle=y_2, heading=heading_2
+                    squared_distance = squared_distance_of_centers_of_gravity(
+                        current_state=state_vars[-1][t], car_1=i, car_2=j
                     )
-                    distance_squared = (x_cog_1 - x_cog_2) ** 2 + (
-                        y_cog_1 - y_cog_2
-                    ) ** 2
                     solver.AddConstraint(
-                        distance_squared >= (2 * CAR_RADIUS) ** 2
+                        squared_distance >= (2 * CAR_RADIUS) ** 2
                     ).evaluator().set_description(
                         "traj {}: time sample {}: avoid collision {}<->{}".format(
                             traj_idx, t, i, j
@@ -481,10 +587,10 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
 
 
 if __name__ == "__main__":
-    START_STATE = np.array([[0, 0, 0, 0, 0, 0], [4, -3, np.pi / 4, 0, 0, 0]])
+    START_STATE = np.array([[0, 0, 0, 0, 0, 0], [4, -3, np.pi / 2, 0, 0, 0]])
     GOAL_CENTER_OF_GRAVITY_POSITION = np.array([[6, 2], [3, 3]])
-    NUM_TIME_SAMPLES = 30
-    COLLISION_SEQUENCE = []
+    NUM_TIME_SAMPLES = 40
+    COLLISION_SEQUENCE = [(0, 1)]
 
     solve(
         start_state=START_STATE,
