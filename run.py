@@ -349,7 +349,7 @@ def solve(start_state, goal_position, num_time_samples, collision_sequence=[]):
         is specified by a pair of cars that will collide.
     """
     # Bounds on time step on each time sample
-    MIN_TIMESTEP = 0.001  # seconds
+    MIN_TIMESTEP = 0.005  # seconds
     MAX_TIMESTEP = 0.2  # seconds
     SOLVER_OUTPUT_FILE = "/tmp/snopt-output.txt"
     SNOPT_ITERATIONS_LIMIT = 100000  # default is 10000
