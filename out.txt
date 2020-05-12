@@ -19,3 +19,222 @@ Solving...
 Done solving: 24.060065031051636 seconds
 Success! Cost: 4.354421800514015
 ## NO COLLISIONS iter 5
+Solving...
+Done solving: 20.75114631652832 seconds
+Success! Cost: 2.280778586860873
+## NO COLLISIONS iter 6
+Solving...
+Done solving: 30.416764497756958 seconds
+Success! Cost: 1.9439493385361648
+## NO COLLISIONS iter 7
+Solving...
+Done solving: 37.31827092170715 seconds
+Success! Cost: 3.8052498639087844
+## NO COLLISIONS iter 8
+Solving...
+Done solving: 31.834349155426025 seconds
+Success! Cost: 2.8936202415815733
+## NO COLLISIONS iter 9
+Solving...
+Done solving: 18.314345121383667 seconds
+Success! Cost: 2.3496273566342394
+## NO COLLISIONS iter 10
+Solving...
+Done solving: 98.1685061454773 seconds
+Success! Cost: 2.7645439768018285
+## NO COLLISIONS iter 11
+Solving...
+Done solving: 45.4516236782074 seconds
+Success! Cost: 3.6743637951991874
+## NO COLLISIONS iter 12
+Solving...
+Done solving: 64.96747517585754 seconds
+Success! Cost: 4.081181270295109
+## NO COLLISIONS iter 13
+Solving...
+Done solving: 19.635287523269653 seconds
+Success! Cost: 1.9389900142960974
+## NO COLLISIONS iter 14
+Solving...
+Done solving: 17.041041374206543 seconds
+Success! Cost: 3.421282191700854
+## NO COLLISIONS iter 15
+Solving...
+Done solving: 15.825096368789673 seconds
+Failed to solve: SolutionResult.kInfeasibleConstraints
+## NO COLLISIONS iter 16
+Solving...
+Done solving: 38.39821457862854 seconds
+Success! Cost: 3.0192545171669876
+## NO COLLISIONS iter 17
+Solving...
+Done solving: 29.168288469314575 seconds
+Success! Cost: 4.465565368056275
+## NO COLLISIONS iter 18
+Solving...
+Done solving: 30.89436149597168 seconds
+Success! Cost: 3.6670732630231333
+## NO COLLISIONS iter 19
+Solving...
+Done solving: 31.935805797576904 seconds
+Success! Cost: 3.518137222003258
+## NO COLLISIONS iter 20
+Solving...
+Done solving: 55.36610794067383 seconds
+Success! Cost: 4.022150646613184
+## NO COLLISIONS iter 21
+Solving...
+Done solving: 15.470054626464844 seconds
+Success! Cost: 3.6643030387754427
+## NO COLLISIONS iter 22
+Solving...
+Done solving: 24.289693355560303 seconds
+Success! Cost: 4.450750345067013
+## NO COLLISIONS iter 23
+Solving...
+Done solving: 43.98329567909241 seconds
+Success! Cost: 3.0023553099414544
+## NO COLLISIONS iter 24
+Solving...
+Done solving: 100.71195244789124 seconds
+Success! Cost: 4.322901230755878
+## NO COLLISIONS iter 25
+Solving...
+Done solving: 23.690441608428955 seconds
+Success! Cost: 3.3321453096284395
+## NO COLLISIONS iter 26
+Solving...
+Done solving: 10.351404905319214 seconds
+Success! Cost: 1.9674781595194868
+## NO COLLISIONS iter 27
+Solving...
+Done solving: 110.61527943611145 seconds
+Success! Cost: 3.65560923157376
+## NO COLLISIONS iter 28
+Solving...
+Done solving: 22.07467246055603 seconds
+Success! Cost: 3.5740667340209784
+## NO COLLISIONS iter 29
+Solving...
+Done solving: 40.97068119049072 seconds
+Success! Cost: 3.568794672985075
+## ONE COLLISION iter 0
+Solving...
+Done solving: 100.39369773864746 seconds
+Failed to solve: SolutionResult.kIterationLimit
+## ONE COLLISION iter 1
+Solving...
+Done solving: 58.527570724487305 seconds
+Success! Cost: 2.1248539294464583
+## ONE COLLISION iter 2
+Solving...
+Done solving: 35.44293999671936 seconds
+Success! Cost: 2.434157996441138
+## ONE COLLISION iter 3
+Solving...
+Done solving: 70.79576516151428 seconds
+Success! Cost: 2.8223300376618807
+## ONE COLLISION iter 4
+Solving...
+Done solving: 90.43805313110352 seconds
+Success! Cost: 4.989370276504741
+## ONE COLLISION iter 5
+Solving...
+Done solving: 53.030847787857056 seconds
+Success! Cost: 2.279454062600586
+## ONE COLLISION iter 6
+Solving...
+Done solving: 327.5383973121643 seconds
+Success! Cost: 3.1404654343972447
+## ONE COLLISION iter 7
+Solving...
+Done solving: 49.50519680976868 seconds
+Success! Cost: 3.450922075473642
+## ONE COLLISION iter 8
+Solving...
+Done solving: 52.504239320755005 seconds
+Success! Cost: 2.652884843013961
+## ONE COLLISION iter 9
+Solving...
+Done solving: 16.32554316520691 seconds
+Success! Cost: 2.806091758810464
+## ONE COLLISION iter 10
+Solving...
+Done solving: 39.361342668533325 seconds
+Success! Cost: 4.332808944930486
+## ONE COLLISION iter 11
+Solving...
+Done solving: 44.8011691570282 seconds
+Success! Cost: 4.998326656668802
+## ONE COLLISION iter 12
+Solving...
+Done solving: 42.19761872291565 seconds
+Success! Cost: 4.851796602465251
+## ONE COLLISION iter 13
+Solving...
+Done solving: 24.531452894210815 seconds
+Success! Cost: 2.668597539272768
+## ONE COLLISION iter 14
+Solving...
+Done solving: 36.02081227302551 seconds
+Success! Cost: 4.444641180859832
+## ONE COLLISION iter 15
+Solving...
+Done solving: 11.439288854598999 seconds
+Failed to solve: SolutionResult.kInfeasibleConstraints
+## ONE COLLISION iter 16
+Solving...
+Done solving: 61.32258915901184 seconds
+Success! Cost: 3.631864594270508
+## ONE COLLISION iter 17
+Solving...
+Done solving: 168.2246446609497 seconds
+Success! Cost: 5.088279447271983
+## ONE COLLISION iter 18
+Solving...
+Done solving: 132.9530692100525 seconds
+Success! Cost: 4.3097770062771525
+## ONE COLLISION iter 19
+Solving...
+Done solving: 29.604349851608276 seconds
+Success! Cost: 3.4251969674222664
+## ONE COLLISION iter 20
+Solving...
+Done solving: 47.89853096008301 seconds
+Success! Cost: 4.055160648385744
+## ONE COLLISION iter 21
+Solving...
+Done solving: 101.81002998352051 seconds
+Success! Cost: 3.931869027488493
+## ONE COLLISION iter 22
+Solving...
+Done solving: 129.2857460975647 seconds
+Failed to solve: SolutionResult.kIterationLimit
+## ONE COLLISION iter 23
+Solving...
+Done solving: 19.79209876060486 seconds
+Success! Cost: 3.905963896806468
+## ONE COLLISION iter 24
+Solving...
+Done solving: 56.557323694229126 seconds
+Success! Cost: 4.114582624940138
+## ONE COLLISION iter 25
+Solving...
+Done solving: 23.02473473548889 seconds
+Success! Cost: 3.4462599628252324
+## ONE COLLISION iter 26
+Solving...
+Done solving: 56.63382339477539 seconds
+Success! Cost: 3.575110142798884
+## ONE COLLISION iter 27
+Solving...
+Done solving: 96.79722499847412 seconds
+Failed to solve: SolutionResult.kIterationLimit
+## ONE COLLISION iter 28
+Solving...
+Done solving: 37.65596342086792 seconds
+Failed to solve: SolutionResult.kUnknownError
+## ONE COLLISION iter 29
+Solving...
+Done solving: 103.64764475822449 seconds
+Failed to solve: SolutionResult.kIterationLimit
