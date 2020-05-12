@@ -1,0 +1,122 @@
+standard bicycle model (no lateral velocity component)
+
+## iter 0
+Solving...
+Done solving: 51.60960245132446 seconds
+Success! Cost: 2.498357852425208
+## iter 1
+Solving...
+Done solving: 29.605095624923706 seconds
+Success! Cost: 2.533838882804702
+## iter 2
+Solving...
+Done solving: 19.45828914642334 seconds
+Success! Cost: 2.4103742824491468
+## iter 3
+Solving...
+Done solving: 14.562309741973877 seconds
+Success! Cost: 3.828407871395171
+## iter 4
+Solving...
+Done solving: 43.47219705581665 seconds
+Success! Cost: 3.003483825573527
+## iter 5
+Solving...
+Done solving: 19.385672092437744 seconds
+Success! Cost: 3.224191999942145
+## iter 6
+Solving...
+Done solving: 17.919102430343628 seconds
+Success! Cost: 1.9435587381289128
+## iter 7
+Solving...
+Done solving: 22.589622259140015 seconds
+Success! Cost: 3.371330559740641
+## iter 8
+Solving...
+Done solving: 35.81738805770874 seconds
+Success! Cost: 2.8924185038503305
+## iter 9
+Solving...
+Done solving: 15.750794410705566 seconds
+Success! Cost: 4.3197418323649135
+## iter 10
+Solving...
+Done solving: 20.404810905456543 seconds
+Success! Cost: 2.610523677034095
+## iter 11
+Solving...
+Done solving: 17.849178075790405 seconds
+Success! Cost: 2.9987101906188993
+## iter 12
+Solving...
+Done solving: 14.343719244003296 seconds
+Success! Cost: 4.073053538031282
+## iter 13
+Solving...
+Done solving: 90.40202856063843 seconds
+Failed to solve: SolutionResult.kIterationLimit
+## iter 14
+Solving...
+Done solving: 46.33805537223816 seconds
+Failed to solve: SolutionResult.kIterationLimit
+## iter 15
+Solving...
+Done solving: 6.957233905792236 seconds
+Failed to solve: SolutionResult.kInfeasibleConstraints
+## iter 16
+Solving...
+Done solving: 14.789963245391846 seconds
+Success! Cost: 2.227982976061277
+## iter 17
+Solving...
+Done solving: 16.64163827896118 seconds
+Success! Cost: 3.2846764026723076
+## iter 18
+Solving...
+Done solving: 13.990077018737793 seconds
+Success! Cost: 3.3381607853873856
+## iter 19
+Solving...
+Done solving: 14.992100238800049 seconds
+Success! Cost: 3.886045707335951
+## iter 20
+Solving...
+Done solving: 53.360944747924805 seconds
+Failed to solve: SolutionResult.kIterationLimit
+## iter 21
+Solving...
+Done solving: 11.704580068588257 seconds
+Success! Cost: 3.657022214235084
+## iter 22
+Solving...
+Done solving: 13.145622730255127 seconds
+Success! Cost: 4.5697591751528375
+## iter 23
+Solving...
+Done solving: 7.448312759399414 seconds
+Success! Cost: 2.351916479629357
+## iter 24
+Solving...
+Done solving: 24.243027925491333 seconds
+Success! Cost: 4.323392154477644
+## iter 25
+Solving...
+Done solving: 27.953190326690674 seconds
+Success! Cost: 3.331889525196666
+## iter 26
+Solving...
+Done solving: 19.462498903274536 seconds
+Success! Cost: 1.9643295867473074
+## iter 27
+Solving...
+Done solving: 21.014954090118408 seconds
+Success! Cost: 4.879863307493325
+## iter 28
+Solving...
+Done solving: 10.490363597869873 seconds
+Success! Cost: 2.8856376883393855
+## iter 29
+Solving...
+Done solving: 1027.4943079948425 seconds
+Failed to solve: SolutionResult.kIterationLimit

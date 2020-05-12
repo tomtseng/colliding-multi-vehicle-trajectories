@@ -1,3 +1,5 @@
+extended bicycle model (has lateral velocity component)
+
 ## NO COLLISIONS iter 0
 Solving...
 Done solving: 74.55660581588745 seconds
