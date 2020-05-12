@@ -1,0 +1,21 @@
+## NO COLLISIONS iter 0
+Solving...
+Done solving: 74.55660581588745 seconds
+Failed to solve: SolutionResult.kIterationLimit
+## NO COLLISIONS iter 1
+Solving...
+Done solving: 118.2420117855072 seconds
+Success! Cost: 2.841502799842383
+## NO COLLISIONS iter 2
+Solving...
+Done solving: 19.812285900115967 seconds
+Success! Cost: 2.4103665405336026
+## NO COLLISIONS iter 3
+Solving...
+Done solving: 25.864929676055908 seconds
+Success! Cost: 3.8233565300232586
+## NO COLLISIONS iter 4
+Solving...
+Done solving: 24.060065031051636 seconds
+Success! Cost: 4.354421800514015
+## NO COLLISIONS iter 5
