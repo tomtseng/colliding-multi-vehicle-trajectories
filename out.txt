@@ -234,6 +234,8 @@ Failed to solve: SolutionResult.kIterationLimit
 Solving...
 Done solving: 37.65596342086792 seconds
 Failed to solve: SolutionResult.kUnknownError
+ SNOPTA EXIT  40 -- terminated after numerical difficulties
+ SNOPTA INFO  41 -- current point cannot be improved
 ## ONE COLLISION iter 29
 Solving...
 Done solving: 103.64764475822449 seconds
