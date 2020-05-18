@@ -1,8 +1,12 @@
 # Multi-vehicle trajectory planning with collisions
 
 Final project for [MIT's Spring 2020 iteration of 6.832: Underactuated
-Robotics](http://underactuated.csail.mit.edu/Spring2020/). See `writeup.pdf` for
-details.
+Robotics](http://underactuated.csail.mit.edu/Spring2020/). See
+[writeup](readme-files/writeup.pdf) for details.
+
+<p align="center">
+  <img src="readme-files/animation.gif" alt="Animation of colliding vehicles produced by the code">
+</p>
 
 ## Setup
 
