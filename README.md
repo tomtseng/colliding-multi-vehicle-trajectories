@@ -4,7 +4,9 @@ Final project for [MIT's Spring 2020 iteration of 6.832: Underactuated
 Robotics](http://underactuated.csail.mit.edu/Spring2020/). See
 [writeup](readme-files/writeup.pdf) for details.
 
-![Animation produced by the code](readme-files/animation.gif){: .center}
+<p align="center">
+  <img src="readme-files/animation.gif" alt="Animation of colliding vehicles produced by the code">
+</p>
 
 ## Setup
 
@@ -35,8 +37,3 @@ python run.py
 ```
 
 See the file comment on run.py to change the vehicle start and stop locations.
-
-
-.center {
-  text-align: center;
-}
