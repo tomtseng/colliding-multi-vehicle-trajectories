@@ -9,7 +9,7 @@ numpy==1.18.3
 pyparsing==2.4.7
 python-dateutil==2.8.1
 pyzmq==19.0.0
-scipy==1.4.1
+scipy==1.10.0
 six==1.14.0
 umsgpack==0.1.0
 virtualenv==20.0.18
